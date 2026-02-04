@@ -1,10 +1,18 @@
+# server/schemas.py
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 
+class NodeData(BaseModel):
+    label: str
+
+class NodePosition(BaseModel):
+    x: float
+    y: float
+
 class Node(BaseModel):
     id: str
-    data: Dict[str, str]
-    position: Dict[str, float]
+    data: NodeData
+    position: NodePosition
     type: str = "default"
 
 class Edge(BaseModel):
@@ -12,6 +20,7 @@ class Edge(BaseModel):
     source: str
     target: str
     label: Optional[str] = None
+    directed: bool = True # <--- NEW FIELD (Default to True)
 
 class Flowchart(BaseModel):
     nodes: List[Node]

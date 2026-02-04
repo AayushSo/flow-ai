@@ -1,5 +1,7 @@
+# server/main.py
 import os
 import json
+import logging # <--- 1. Import Logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -7,8 +9,11 @@ from google import genai
 from google.genai import types
 from schemas import Flowchart, PromptRequest
 
-load_dotenv()
+# 2. Configure Logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
+load_dotenv()
 app = FastAPI()
 
 app.add_middleware(
@@ -23,14 +28,18 @@ client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 @app.post("/generate", response_model=Flowchart)
 async def generate_flow(request: PromptRequest):
+    # 3. Log the incoming request
+    logger.info(f"Received prompt: {request.prompt}")
+
     system_prompt = """
     You are a flowchart architect. Output pure JSON.
     1. Nodes must have 'data': {'label': '...'} and 'position': {'x': 0, 'y': 0}.
     2. 'type' should be 'default'.
     3. Edges must link valid node IDs.
+    4. Set 'directed' to true for process flows (arrows), false for mind maps (lines).
     """
 
-    # We manually define the schema here to avoid SDK/Pydantic conflicts
+    # 4. Update Schema to include 'directed'
     json_schema = {
         "type": "object",
         "properties": {
@@ -63,9 +72,10 @@ async def generate_flow(request: PromptRequest):
                         "id": {"type": "string"},
                         "source": {"type": "string"},
                         "target": {"type": "string"},
-                        "label": {"type": "string"}
+                        "label": {"type": "string"},
+                        "directed": {"type": "boolean"} # <--- Added this
                     },
-                    "required": ["id", "source", "target"]
+                    "required": ["id", "source", "target", "directed"]
                 }
             }
         },
@@ -73,7 +83,7 @@ async def generate_flow(request: PromptRequest):
     }
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash-lite", # Using the stable 2.0 Flash model
+        model="gemini-2.5-flash-lite", 
         contents=request.prompt,
         config=types.GenerateContentConfig(
             system_instruction=system_prompt,
@@ -82,14 +92,14 @@ async def generate_flow(request: PromptRequest):
         )
     )
     
-    # Manually parse the JSON string response
-    # This is safer than relying on response.parsed for complex nested schemas right now
     try:
         if response.text:
+            # 5. Log the raw AI output for debugging
+            logger.info(f"AI Response: {response.text}") 
             data = json.loads(response.text)
             return data
         else:
             return {"nodes": [], "edges": []}
     except Exception as e:
-        print(f"Error parsing JSON: {e}")
+        logger.error(f"Error parsing JSON: {e}")
         return {"nodes": [], "edges": []}
