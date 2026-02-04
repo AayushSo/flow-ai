@@ -3,9 +3,9 @@ from typing import List, Optional, Dict
 
 class Node(BaseModel):
     id: str
-    data: Dict[str, str]  # React Flow expects {"label": "Text"} here
+    data: Dict[str, str]
+    position: Dict[str, float]
     type: str = "default"
-    position: Dict[str, float] = {"x": 0, "y": 0}
 
 class Edge(BaseModel):
     id: str
