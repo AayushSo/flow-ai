@@ -36,10 +36,8 @@ function Flowchart() {
   const [mode, setMode] = useState("flowchart");
   const [loading, setLoading] = useState(false);
   
-  // --- DIRTY STATE (Unsaved Changes) ---
+  // --- STATE ---
   const [isDirty, setIsDirty] = useState(false);
-
-  // --- HISTORY STATE (Undo/Redo) ---
   const [history, setHistory] = useState<any[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
@@ -56,11 +54,15 @@ function Flowchart() {
     group: GroupNode
   }), []);
 
-  // --- WRAPPERS FOR DIRTY STATE ---
-  // We wrap React Flow change handlers to flag "Unsaved Changes"
+  // --- DETECT PENDING CHANGES ---
+  // Check if any node is currently highlighted in "New" Green
+  const hasPendingChanges = useMemo(() => {
+    return nodes.some(n => n.data.backgroundColor === '#d0f0c0');
+  }, [nodes]);
+
+  // --- WRAPPERS ---
   const onNodesChangeWrapped = useCallback((changes: any) => {
     onNodesChange(changes);
-    // Only mark dirty if actual changes happened (e.g. dragging)
     if (changes.length > 0) setIsDirty(true);
   }, [onNodesChange]);
 
@@ -74,7 +76,7 @@ function Flowchart() {
     setIsDirty(true);
   }, [setEdges]);
 
-  // --- UNDO / REDO ---
+  // --- HISTORY ---
   const addToHistory = (newNodes: any[], newEdges: any[]) => {
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push({ nodes: newNodes, edges: newEdges });
@@ -89,7 +91,7 @@ function Flowchart() {
       setNodes(state.nodes);
       setEdges(state.edges);
       setHistoryIndex(prevIndex);
-      setIsDirty(true); // Undo counts as a change
+      setIsDirty(true);
     }
   };
 
@@ -104,21 +106,41 @@ function Flowchart() {
     }
   };
 
-  // --- NEW CANVAS ---
+  // --- ACTIONS ---
   const handleNewCanvas = () => {
     if (nodes.length > 0 && isDirty) {
-      const confirm = window.confirm("You have unsaved changes. Are you sure you want to create a new canvas?");
-      if (!confirm) return;
+      if(!window.confirm("Unsaved changes. Create new canvas?")) return;
     }
     setNodes([]);
     setEdges([]);
     setHistory([]);
     setHistoryIndex(-1);
     setPrompt("");
-    setIsDirty(false); // Fresh canvas is clean
+    setIsDirty(false);
   };
 
-  // --- SAVE ---
+  // NEW: Accept Changes Function
+  const handleAcceptChanges = () => {
+    const cleanNodes = nodes.map(node => {
+      // If node is Green (#d0f0c0), reset it to default
+      if (node.data.backgroundColor === '#d0f0c0') {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            // Restore default colors based on type
+            backgroundColor: node.type === 'group' ? 'rgba(240, 240, 240, 0.4)' : '#ffffff'
+          }
+        };
+      }
+      return node;
+    });
+
+    setNodes(cleanNodes);
+    addToHistory(cleanNodes, edges); // Allow Undo of "Accept"
+    setIsDirty(true);
+  };
+
   const onSave = useCallback(() => {
     const flow = toObject();
     const blob = new Blob([JSON.stringify(flow, null, 2)], { type: 'application/json' });
@@ -128,13 +150,12 @@ function Flowchart() {
     a.download = `flowchart-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    setIsDirty(false); // Saved!
+    setIsDirty(false);
   }, [toObject]);
 
-  // --- LOAD ---
   const onLoadClick = () => {
     if (nodes.length > 0 && isDirty) {
-       if(!window.confirm("You have unsaved changes. Load new file anyway?")) return;
+       if(!window.confirm("Unsaved changes. Load file?")) return;
     }
     fileInputRef.current?.click();
   };
@@ -148,14 +169,12 @@ function Flowchart() {
       try {
         const result = e.target?.result as string;
         const flowData = JSON.parse(result);
-
         if (flowData.nodes && flowData.edges) {
           setNodes(flowData.nodes || []);
           setEdges(flowData.edges || []);
           setHistory([{ nodes: flowData.nodes, edges: flowData.edges }]);
           setHistoryIndex(0);
-          setIsDirty(false); // Just loaded, so clean
-          
+          setIsDirty(false);
           if (flowData.viewport) {
             const { x, y, zoom } = flowData.viewport;
             setViewport({ x, y, zoom });
@@ -163,26 +182,19 @@ function Flowchart() {
             setTimeout(() => fitView(), 100);
           }
         }
-      } catch (err) {
-        alert("Invalid flowchart file.");
-      }
+      } catch (err) { alert("Invalid file."); }
     };
     reader.readAsText(file);
     event.target.value = ''; 
   };
 
-  // --- GENERATE / UPDATE ---
   const handleGenerate = async () => {
     if (!prompt) return;
     setLoading(true);
-
     try {
       const currentGraph = nodes.length > 0 ? { nodes, edges } : null;
-
       const res = await axios.post("http://localhost:8000/generate", { 
-        prompt, 
-        mode,
-        current_graph: currentGraph 
+        prompt, mode, current_graph: currentGraph 
       });
 
       const oldNodeIds = new Set(nodes.map(n => n.id));
@@ -210,23 +222,18 @@ function Flowchart() {
       }));
 
       const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(processedNodes, processedEdges);
-      
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
       addToHistory(layoutedNodes, layoutedEdges);
-      setIsDirty(true); // Generated new content
-
+      setIsDirty(true);
       setTimeout(() => fitView(), 100);
-    } catch (error) {
-      console.error(error);
-      alert("Error generating flow");
-    }
+    } catch (error) { console.error(error); alert("Error generating flow"); }
     setLoading(false);
   };
 
   const loadDemo = () => {
     if (nodes.length > 0 && isDirty) {
-        if(!window.confirm("Load demo will replace current unsaved work. Continue?")) return;
+        if(!window.confirm("Discard changes?")) return;
     }
     const { nodes: demoNodes, edges: demoEdges } = getDemoData();
     const { nodes: lNodes, edges: lEdges } = getLayoutedElements(demoNodes, demoEdges);
@@ -234,7 +241,7 @@ function Flowchart() {
     setEdges(lEdges);
     setHistory([{ nodes: lNodes, edges: lEdges }]);
     setHistoryIndex(0);
-    setIsDirty(false); // Treated as a fresh start
+    setIsDirty(false);
     setTimeout(() => fitView(), 100);
   };
 
@@ -280,19 +287,15 @@ function Flowchart() {
              <button onClick={handleRedo} disabled={historyIndex >= history.length - 1} style={{ cursor: historyIndex < history.length - 1 ? 'pointer' : 'not-allowed', opacity: historyIndex < history.length - 1 ? 1 : 0.5, fontSize: '18px', border: 'none', background: 'transparent' }} title="Redo">↪️</button>
         </div>
 
-        <select 
-          value={mode} 
-          onChange={(e) => setMode(e.target.value)}
-          style={{ padding: '10px', borderRadius: '4px', border: '1px solid #ccc' }}
-        >
-          <option value="flowchart">Flowchart Mode</option>
-          <option value="system">System Arch Mode</option>
+        <select value={mode} onChange={(e) => setMode(e.target.value)} style={{ padding: '10px', borderRadius: '4px', border: '1px solid #ccc' }}>
+          <option value="flowchart">Flowchart</option>
+          <option value="system">Architecture</option>
         </select>
 
         <input
           type="text"
           style={{ flex: 1, padding: '10px', fontSize: '16px', borderRadius: '4px', border: '1px solid #ccc' }}
-          placeholder="Describe changes (e.g., 'Add a cache layer' or 'Remove step 2')"
+          placeholder="Describe changes..."
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={handleKeyDown} 
@@ -304,38 +307,40 @@ function Flowchart() {
           disabled={loading}
           style={{ padding: '10px 20px', cursor: 'pointer', backgroundColor: loading ? '#ccc' : '#007bff', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
         >
-          {loading ? "Thinking..." : "Update Flow"}
+          {loading ? "Thinking..." : "Update"}
         </button>
 
-        <div style={{ width: '1px', height: '30px', background: '#ddd', margin: '0 10px' }}></div>
+        {/* ACCEPT CHANGES BUTTON (Only visible when green nodes exist) */}
+        {hasPendingChanges && (
+            <button 
+                onClick={handleAcceptChanges}
+                style={{ padding: '10px 15px', backgroundColor: '#198754', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', animation: 'fadeIn 0.3s' }}
+                title="Accept Changes (Reset Colors)"
+            >
+                <span>✓</span> Accept
+            </button>
+        )}
 
-        {/* --- TOOLS --- */}
-        {/* New Canvas Button */}
-        <button onClick={handleNewCanvas} title="New Canvas" style={{ padding: '10px 15px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
-           📄 New
-        </button>
+        <div style={{ width: '1px', height: '30px', background: '#ddd', margin: '0 5px' }}></div>
 
-        <button onClick={onSave} title="Save JSON" style={{ padding: '10px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
-           {isDirty ? '💾 *' : '💾'} 
-        </button>
+        <button onClick={handleNewCanvas} title="New Canvas" style={{ padding: '10px 15px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>📄</button>
+        <button onClick={onSave} title="Save JSON" style={{ padding: '10px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>{isDirty ? '💾 *' : '💾'}</button>
         <button onClick={onLoadClick} title="Load JSON" style={{ padding: '10px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>📂</button>
         <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".json" onChange={handleFileUpload} />
-        
         <button onClick={onDownloadImage} title="Export PNG" style={{ padding: '10px 15px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>📷</button>
         <button onClick={loadDemo} title="Load Example" style={{ padding: '10px 15px', backgroundColor: '#6f42c1', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>🚀</button>
       </div>
 
-      {/* CANVAS */}
       <div style={{ flex: 1, width: '100%', position: 'relative', background: '#fafafa' }}>
         <ReactFlow 
             nodes={nodes} 
             edges={edges} 
             nodeTypes={nodeTypes} 
-            onNodesChange={onNodesChangeWrapped} // Wrapped
-            onEdgesChange={onEdgesChangeWrapped} // Wrapped
+            onNodesChange={onNodesChangeWrapped}
+            onEdgesChange={onEdgesChangeWrapped}
             onNodeClick={(_, n) => { setSelectedNodeId(n.id); setEditorOpen(true); }} 
             onPaneClick={() => setSelectedNodeId(null)} 
-            onConnect={onConnectWrapped}         // Wrapped
+            onConnect={onConnectWrapped}
             fitView 
             minZoom={0.1}
         >
@@ -343,7 +348,6 @@ function Flowchart() {
           <Controls />
         </ReactFlow>
 
-        {/* We wrap setNodes/setEdges here so EditorPanel changes also trigger 'Dirty' state */}
         <EditorPanel 
             nodes={nodes} 
             edges={edges} 
