@@ -193,7 +193,8 @@ function Flowchart() {
     setLoading(true);
     try {
       const currentGraph = nodes.length > 0 ? { nodes, edges } : null;
-      const res = await axios.post("http://localhost:8000/generate", { 
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+      const res = await axios.post(`${API_URL}/generate`,{ 
         prompt, mode, current_graph: currentGraph 
       });
 
