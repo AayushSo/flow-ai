@@ -9,10 +9,11 @@ import {
   ReactFlowProvider,
   addEdge,
   useReactFlow,
-  getNodesBounds,
+  getNodesBounds
+  ,
   // Panel,  <-- REMOVE THIS (Fixes TS6133)
-  Node,      // <-- ADD THIS
-  Edge       // <-- ADD THIS
+  type Node,      // <-- ADD THIS
+  type Edge       // <-- ADD THIS
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import axios from "axios";

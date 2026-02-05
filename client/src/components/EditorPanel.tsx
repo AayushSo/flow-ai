@@ -8,7 +8,7 @@ const safeColor = (color: string | undefined) => {
   return '#ffffff';
 };
 
-export function EditorPanel({ nodes, edges, setNodes, setEdges, selectedNodeId, onSelectNode, isOpen, toggleOpen }: any) {
+export function EditorPanel({ nodes, edges, setNodes, setEdges, selectedNodeId, isOpen, toggleOpen }: any) {
     if (!isOpen) {
       return (
         <button 
