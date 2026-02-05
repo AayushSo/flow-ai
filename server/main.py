@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from schemas import Flowchart, PromptRequest
+# --- NEW: Import CORS Middleware ---
+from fastapi.middleware.cors import CORSMiddleware
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -16,7 +18,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
