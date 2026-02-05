@@ -28,26 +28,43 @@ client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 async def generate_flow(request: PromptRequest):
     logger.info(f"Received prompt: {request.prompt} | Mode: {request.mode}")
 
-    # 1. Select the Strategy based on Mode
+    # --- CONSTRUCT PROMPT WITH CONTEXT ---
+    context_instruction = ""
+    if request.current_graph and len(request.current_graph.nodes) > 0:
+        graph_str = json.dumps(request.current_graph.model_dump(), indent=2)
+        context_instruction = f"""
+        ERROR CORRECTION / UPDATE MODE:
+        The user wants to update an EXISTING graph.
+        Current Graph JSON:
+        {graph_str}
+
+        INSTRUCTIONS:
+        1. Parse the User Request below and modify the graph accordingly.
+        2. KEEP existing nodes/edges unless the user explicitly asks to remove them.
+        3. PRESERVE existing node IDs if possible to maintain layout stability.
+        4. ADD new nodes with unique IDs.
+        5. RETURN the full updated graph (old + new).
+        """
+    
+    # Select Strategy
     if request.mode == "system":
-        system_instruction = """
+        system_instruction = f"""
         You are a System Architecture Expert. Output pure JSON.
-        1. Identify high-level components (e.g., 'Frontend', 'Backend', 'Database') and create them as Container Nodes.
-        2. Create sub-components inside them using the 'parentId' field.
-        3. Container Nodes must have 'type': 'group'. (Standard nodes are 'default').
-        4. Use 'directed': true for data flow.
-        5. CONSTRAINT: Do not create more than 5 direct children per container. Group excess items into logical sub-groups if necessary.
+        {context_instruction}
+        1. Identify high-level components (e.g., 'Frontend', 'Backend', 'Database') -> 'group' nodes.
+        2. Create sub-components inside them using 'parentId'.
+        3. Use 'directed': true for data flow.
         """
     else:
-        system_instruction = """
-        You are a Flowchart Architect. Output pure JSON.
-        1. Create a logical step-by-step flow.
-        2. Use 'type': 'default' for all nodes.
-        3. Do not use parentId.
-        4. CONSTRAINT: Keep the tree balanced. If a node has >5 children, introduce an intermediate category node to group them.
+        system_instruction = f"""
+        You are a Flowchart Expert. Output pure JSON.
+        {context_instruction}
+        1. Create clear logical steps.
+        2. 'type' should be 'default'.
+        3. Connect steps with 'directed': true.
         """
 
-    # 2. Update Schema
+    # JSON Schema (Strict Output)
     json_schema = {
         "type": "object",
         "properties": {
@@ -57,18 +74,25 @@ async def generate_flow(request: PromptRequest):
                     "type": "object",
                     "properties": {
                         "id": {"type": "string"},
-                        "type": {"type": "string"},
-                        "parentId": {"type": "string"},
+                        "type": {"type": "string", "enum": ["default", "group", "smart"]},
                         "data": {
                             "type": "object",
-                            "properties": {"label": {"type": "string"}},
+                            "properties": {
+                                "label": {"type": "string"},
+                                "body": {"type": "string"},
+                                "backgroundColor": {"type": "string"}
+                            },
                             "required": ["label"]
                         },
                         "position": {
                             "type": "object",
-                            "properties": {"x": {"type": "number"}, "y": {"type": "number"}},
+                            "properties": {
+                                "x": {"type": "number"},
+                                "y": {"type": "number"}
+                            },
                             "required": ["x", "y"]
-                        }
+                        },
+                        "parentId": {"type": "string"}
                     },
                     "required": ["id", "data", "position", "type"]
                 }
@@ -103,7 +127,7 @@ async def generate_flow(request: PromptRequest):
     
     try:
         if response.text:
-            logger.info(f"AI Response: {response.text}")
+            logger.info("AI Response received.")
             data = json.loads(response.text)
             return data
         else:
