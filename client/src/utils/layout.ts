@@ -9,14 +9,14 @@ export const getLayoutedElements = (nodes: any[], edges: any[]) => {
     if (node.type === 'group') return { width: 100, height: 100 };
     
     // Base size
-    let width = 170;
+    let width = 200;
     let height = 40;
 
     // Check for Body Text
     if (node.data?.body) {
-       // Approximate height calculation: 40px base + 15px per line of text
-       const lines = Math.ceil((node.data.body.length || 0) / 25); // ~25 chars per line
-       height += Math.max(20, lines * 15);
+       const charCount = node.data.body.length || 0;
+       const lines = Math.ceil(charCount / 30); // Assume ~30 chars fit in 200px width
+       height += Math.max(20, lines * 20); // 20px per line
     }
 
     return { width, height };
@@ -54,7 +54,7 @@ export const getLayoutedElements = (nodes: any[], edges: any[]) => {
     const groups = nodes.filter(n => n.type === 'group');
     
     let processedNodes = [...nodes];
-    const GROUP_PADDING = 40; 
+    const GROUP_PADDING = 60; 
 
     // 1. Process Groups First
     groups.forEach(group => {
