@@ -4,6 +4,7 @@ import type { NodeProps } from '@xyflow/react';
 // --- 1. The Smart Node ---
 export function SmartNode({ data, selected }: NodeProps) {
   const hasBody = data.body && typeof data.body === 'string' && data.body.trim().length > 0;
+  // FIX: Read color from data.backgroundColor
   const bgColor = (data.backgroundColor as string) || '#ffffff';
 
   return (
@@ -40,7 +41,8 @@ export function SmartNode({ data, selected }: NodeProps) {
         backgroundColor: 'rgba(0,0,0,0.05)', 
         borderBottom: hasBody ? '1px solid rgba(0,0,0,0.1)' : 'none'
       }}>
-        {data.label as string}
+        {/* NUCLEAR FIX: Wrap in String() to force type compatibility */}
+        {String(data.label)}
       </div>
 
       {/* Body */}
@@ -54,7 +56,8 @@ export function SmartNode({ data, selected }: NodeProps) {
           flex: 1, 
           overflowY: 'auto' 
         }}>
-          {data.body as string}
+           {/* NUCLEAR FIX: Wrap in String() */}
+          {String(data.body)}
         </div>
       )}
 
@@ -100,8 +103,8 @@ export function GroupNode({ data, selected }: NodeProps) {
         zIndex: 5,
         whiteSpace: 'nowrap'
       }}>
-        {/* THIS is where the error likely persists if not saved/pushed */}
-        {data.label as string}
+         {/* NUCLEAR FIX: Wrap in String() */}
+        {String(data.label)}
       </div>
     </div>
   );
