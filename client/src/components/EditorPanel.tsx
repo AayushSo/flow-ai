@@ -1,7 +1,6 @@
 import { MarkerType } from "@xyflow/react";
 
 // --- Helper: Safe Color for Input ---
-// Prevents crash if color is rgba() or undefined
 const safeColor = (color: string | undefined) => {
   if (!color || typeof color !== 'string') return '#ffffff';
   if (color.startsWith('#') && color.length === 7) return color;
@@ -42,12 +41,6 @@ export function EditorPanel({ nodes, edges, setNodes, setEdges, selectedNodeId, 
       }));
     };
   
-    // const deleteNode = (id: string) => {
-      // setNodes((nds: any[]) => nds.filter((n) => n.id !== id));
-      // setEdges((eds: any[]) => eds.filter((e) => e.source !== id && e.target !== id));
-      // if (selectedNodeId === id) onSelectNode(null);
-    // };
-  
     const addEdge = (targetId: string) => {
       const newEdge = {
           id: `e-${selectedNodeId}-${targetId}`,
@@ -78,14 +71,16 @@ export function EditorPanel({ nodes, edges, setNodes, setEdges, selectedNodeId, 
                   <input type="text" value={selectedNode.data.label} onChange={(e) => updateNode(selectedNode.id, 'label', e.target.value)} style={{ width: '100%', padding: '5px', borderRadius: '4px', border: '1px solid #ccc' }} />
                </div>
 
-               {/* ADDED: Color Picker */}
+               {/* Color Picker */}
                <div style={{ marginBottom: '10px' }}>
                   <label style={{display: 'block', fontSize: '12px', marginBottom: '4px'}}>Node Color:</label>
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                       <input 
                         type="color" 
-                        value={safeColor(selectedNode.style?.backgroundColor)} 
-						onChange={(e) => updateNode(selectedNode.id, 'backgroundColor', e.target.value)} // No 'true' = save to data                        style={{ width: '40px', height: '40px', border: 'none', padding: 0, cursor: 'pointer', borderRadius: '4px' }} 
+                        // FIX: Read from 'data', not 'style'
+                        value={safeColor(selectedNode.data?.backgroundColor)} 
+                        onChange={(e) => updateNode(selectedNode.id, 'backgroundColor', e.target.value)}
+                        style={{ width: '40px', height: '40px', border: 'none', padding: 0, cursor: 'pointer', borderRadius: '4px' }} 
                       />
                       <span style={{ fontSize: '12px', color: '#666' }}>Click to change background</span>
                   </div>

@@ -4,7 +4,6 @@ import type { NodeProps } from '@xyflow/react';
 // --- 1. The Smart Node ---
 export function SmartNode({ data, selected }: NodeProps) {
   const hasBody = data.body && typeof data.body === 'string' && data.body.trim().length > 0;
-  // FIX: Read color from data.backgroundColor
   const bgColor = (data.backgroundColor as string) || '#ffffff';
 
   return (
@@ -38,7 +37,6 @@ export function SmartNode({ data, selected }: NodeProps) {
       <div style={{ 
         padding: '8px 10px', 
         fontWeight: 'bold',
-        // Make header slightly darker than the chosen background color
         backgroundColor: 'rgba(0,0,0,0.05)', 
         borderBottom: hasBody ? '1px solid rgba(0,0,0,0.1)' : 'none'
       }}>
@@ -67,7 +65,6 @@ export function SmartNode({ data, selected }: NodeProps) {
 
 // --- 2. The Group Node ---
 export function GroupNode({ data, selected }: NodeProps) {
-  // FIX: Read color from data.backgroundColor
   const bgColor = (data.backgroundColor as string) || 'rgba(240, 240, 240, 0.4)';
 
   return (
@@ -103,6 +100,7 @@ export function GroupNode({ data, selected }: NodeProps) {
         zIndex: 5,
         whiteSpace: 'nowrap'
       }}>
+        {/* THIS is where the error likely persists if not saved/pushed */}
         {data.label as string}
       </div>
     </div>
