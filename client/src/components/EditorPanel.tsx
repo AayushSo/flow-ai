@@ -42,11 +42,11 @@ export function EditorPanel({ nodes, edges, setNodes, setEdges, selectedNodeId, 
       }));
     };
   
-    const deleteNode = (id: string) => {
-      setNodes((nds: any[]) => nds.filter((n) => n.id !== id));
-      setEdges((eds: any[]) => eds.filter((e) => e.source !== id && e.target !== id));
-      if (selectedNodeId === id) onSelectNode(null);
-    };
+    // const deleteNode = (id: string) => {
+      // setNodes((nds: any[]) => nds.filter((n) => n.id !== id));
+      // setEdges((eds: any[]) => eds.filter((e) => e.source !== id && e.target !== id));
+      // if (selectedNodeId === id) onSelectNode(null);
+    // };
   
     const addEdge = (targetId: string) => {
       const newEdge = {

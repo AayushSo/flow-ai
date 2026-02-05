@@ -10,7 +10,9 @@ import {
   addEdge,
   useReactFlow,
   getNodesBounds,
-  Panel
+  // Panel,  <-- REMOVE THIS (Fixes TS6133)
+  Node,      // <-- ADD THIS
+  Edge       // <-- ADD THIS
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import axios from "axios";
@@ -41,8 +43,10 @@ function Flowchart() {
   const [history, setHistory] = useState<any[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+//  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+//  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   
