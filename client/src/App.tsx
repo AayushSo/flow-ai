@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { 
   ReactFlow, 
   Background, 
@@ -36,8 +36,10 @@ function Flowchart() {
   const [mode, setMode] = useState("flowchart");
   const [loading, setLoading] = useState(false);
   
-  // --- HISTORY STATE ---
-  // We store snapshots of { nodes, edges } for Undo/Redo
+  // --- DIRTY STATE (Unsaved Changes) ---
+  const [isDirty, setIsDirty] = useState(false);
+
+  // --- HISTORY STATE (Undo/Redo) ---
   const [history, setHistory] = useState<any[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
@@ -54,9 +56,26 @@ function Flowchart() {
     group: GroupNode
   }), []);
 
-  // --- UNDO / REDO LOGIC ---
+  // --- WRAPPERS FOR DIRTY STATE ---
+  // We wrap React Flow change handlers to flag "Unsaved Changes"
+  const onNodesChangeWrapped = useCallback((changes: any) => {
+    onNodesChange(changes);
+    // Only mark dirty if actual changes happened (e.g. dragging)
+    if (changes.length > 0) setIsDirty(true);
+  }, [onNodesChange]);
+
+  const onEdgesChangeWrapped = useCallback((changes: any) => {
+    onEdgesChange(changes);
+    if (changes.length > 0) setIsDirty(true);
+  }, [onEdgesChange]);
+
+  const onConnectWrapped = useCallback((params: any) => {
+    setEdges((eds) => addEdge(params, eds));
+    setIsDirty(true);
+  }, [setEdges]);
+
+  // --- UNDO / REDO ---
   const addToHistory = (newNodes: any[], newEdges: any[]) => {
-    // If we are in the middle of history and make a change, cut off the future
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push({ nodes: newNodes, edges: newEdges });
     setHistory(newHistory);
@@ -70,6 +89,7 @@ function Flowchart() {
       setNodes(state.nodes);
       setEdges(state.edges);
       setHistoryIndex(prevIndex);
+      setIsDirty(true); // Undo counts as a change
     }
   };
 
@@ -80,7 +100,22 @@ function Flowchart() {
       setNodes(state.nodes);
       setEdges(state.edges);
       setHistoryIndex(nextIndex);
+      setIsDirty(true);
     }
+  };
+
+  // --- NEW CANVAS ---
+  const handleNewCanvas = () => {
+    if (nodes.length > 0 && isDirty) {
+      const confirm = window.confirm("You have unsaved changes. Are you sure you want to create a new canvas?");
+      if (!confirm) return;
+    }
+    setNodes([]);
+    setEdges([]);
+    setHistory([]);
+    setHistoryIndex(-1);
+    setPrompt("");
+    setIsDirty(false); // Fresh canvas is clean
   };
 
   // --- SAVE ---
@@ -93,10 +128,14 @@ function Flowchart() {
     a.download = `flowchart-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    setIsDirty(false); // Saved!
   }, [toObject]);
 
   // --- LOAD ---
   const onLoadClick = () => {
+    if (nodes.length > 0 && isDirty) {
+       if(!window.confirm("You have unsaved changes. Load new file anyway?")) return;
+    }
     fileInputRef.current?.click();
   };
 
@@ -113,9 +152,9 @@ function Flowchart() {
         if (flowData.nodes && flowData.edges) {
           setNodes(flowData.nodes || []);
           setEdges(flowData.edges || []);
-          // Reset history on load
           setHistory([{ nodes: flowData.nodes, edges: flowData.edges }]);
           setHistoryIndex(0);
+          setIsDirty(false); // Just loaded, so clean
           
           if (flowData.viewport) {
             const { x, y, zoom } = flowData.viewport;
@@ -130,6 +169,73 @@ function Flowchart() {
     };
     reader.readAsText(file);
     event.target.value = ''; 
+  };
+
+  // --- GENERATE / UPDATE ---
+  const handleGenerate = async () => {
+    if (!prompt) return;
+    setLoading(true);
+
+    try {
+      const currentGraph = nodes.length > 0 ? { nodes, edges } : null;
+
+      const res = await axios.post("http://localhost:8000/generate", { 
+        prompt, 
+        mode,
+        current_graph: currentGraph 
+      });
+
+      const oldNodeIds = new Set(nodes.map(n => n.id));
+
+      let processedNodes = res.data.nodes.map((node: any) => {
+        const isGroup = node.type === 'group';
+        const isNew = !oldNodeIds.has(node.id);
+        
+        return {
+            ...node,
+            type: isGroup ? 'group' : 'smart', 
+            data: { 
+              label: node.data.label,
+              body: node.data.body || "",
+              backgroundColor: isNew ? '#d0f0c0' : (node.data.backgroundColor || (isGroup ? 'rgba(240, 240, 240, 0.4)' : '#ffffff'))
+            }, 
+            style: isGroup ? { width: 100, height: 100, zIndex: -1 } : {}
+        };
+      });
+
+      const processedEdges = res.data.edges.map((edge: any) => ({
+        ...edge,
+        markerEnd: { type: MarkerType.ArrowClosed },
+        style: { strokeWidth: 2 }
+      }));
+
+      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(processedNodes, processedEdges);
+      
+      setNodes(layoutedNodes);
+      setEdges(layoutedEdges);
+      addToHistory(layoutedNodes, layoutedEdges);
+      setIsDirty(true); // Generated new content
+
+      setTimeout(() => fitView(), 100);
+    } catch (error) {
+      console.error(error);
+      alert("Error generating flow");
+    }
+    setLoading(false);
+  };
+
+  const loadDemo = () => {
+    if (nodes.length > 0 && isDirty) {
+        if(!window.confirm("Load demo will replace current unsaved work. Continue?")) return;
+    }
+    const { nodes: demoNodes, edges: demoEdges } = getDemoData();
+    const { nodes: lNodes, edges: lEdges } = getLayoutedElements(demoNodes, demoEdges);
+    setNodes(lNodes);
+    setEdges(lEdges);
+    setHistory([{ nodes: lNodes, edges: lEdges }]);
+    setHistoryIndex(0);
+    setIsDirty(false); // Treated as a fresh start
+    setTimeout(() => fitView(), 100);
   };
 
   const onDownloadImage = () => {
@@ -154,76 +260,6 @@ function Flowchart() {
     }
   };
 
-  // --- GENERATE / UPDATE ---
-  const handleGenerate = async () => {
-    if (!prompt) return;
-    setLoading(true);
-
-    try {
-      // 1. Capture current state for the "Context"
-      const currentGraph = nodes.length > 0 ? { nodes, edges } : null;
-
-      // 2. API Call
-      const res = await axios.post("http://localhost:8000/generate", { 
-        prompt, 
-        mode,
-        current_graph: currentGraph 
-      });
-
-      // 3. Process new nodes
-      // We detect "NEW" nodes by checking if their ID existed in the old list
-      const oldNodeIds = new Set(nodes.map(n => n.id));
-
-      let processedNodes = res.data.nodes.map((node: any) => {
-        const isGroup = node.type === 'group';
-        const isNew = !oldNodeIds.has(node.id);
-        
-        return {
-            ...node,
-            type: isGroup ? 'group' : 'smart', 
-            data: { 
-              label: node.data.label,
-              body: node.data.body || "",
-              // If it's NEW, give it a light green tint, otherwise standard
-              backgroundColor: isNew ? '#d0f0c0' : (node.data.backgroundColor || (isGroup ? 'rgba(240, 240, 240, 0.4)' : '#ffffff'))
-            }, 
-            style: isGroup ? { width: 100, height: 100, zIndex: -1 } : {}
-        };
-      });
-
-      const processedEdges = res.data.edges.map((edge: any) => ({
-        ...edge,
-        markerEnd: { type: MarkerType.ArrowClosed },
-        style: { strokeWidth: 2 }
-      }));
-
-      // 4. Layout
-      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(processedNodes, processedEdges);
-      
-      // 5. Update State & History
-      setNodes(layoutedNodes);
-      setEdges(layoutedEdges);
-      addToHistory(layoutedNodes, layoutedEdges);
-
-      setTimeout(() => fitView(), 100);
-    } catch (error) {
-      console.error(error);
-      alert("Error generating flow");
-    }
-    setLoading(false);
-  };
-
-  // Demo Load
-  const loadDemo = () => {
-    const { nodes: demoNodes, edges: demoEdges } = getDemoData();
-    const { nodes: lNodes, edges: lEdges } = getLayoutedElements(demoNodes, demoEdges);
-    setNodes(lNodes);
-    setEdges(lEdges);
-    setHistory([{ nodes: lNodes, edges: lEdges }]);
-    setHistoryIndex(0);
-    setTimeout(() => fitView(), 100);
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -238,7 +274,7 @@ function Flowchart() {
       <div style={{ padding: '10px 20px', background: '#f0f2f5', borderBottom: '1px solid #ccc', display: 'flex', gap: '10px', alignItems: 'center' }}>
         <h3 style={{ margin: 0, marginRight: '10px', color: '#333' }}>✨ AI Flow</h3>
         
-        {/* Undo/Redo Buttons */}
+        {/* Undo/Redo */}
         <div style={{ display: 'flex', gap: '5px', marginRight: '10px' }}>
              <button onClick={handleUndo} disabled={historyIndex <= 0} style={{ cursor: historyIndex > 0 ? 'pointer' : 'not-allowed', opacity: historyIndex > 0 ? 1 : 0.5, fontSize: '18px', border: 'none', background: 'transparent' }} title="Undo">↩️</button>
              <button onClick={handleRedo} disabled={historyIndex >= history.length - 1} style={{ cursor: historyIndex < history.length - 1 ? 'pointer' : 'not-allowed', opacity: historyIndex < history.length - 1 ? 1 : 0.5, fontSize: '18px', border: 'none', background: 'transparent' }} title="Redo">↪️</button>
@@ -273,9 +309,18 @@ function Flowchart() {
 
         <div style={{ width: '1px', height: '30px', background: '#ddd', margin: '0 10px' }}></div>
 
-        <button onClick={onSave} title="Save JSON" style={{ padding: '10px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>💾</button>
+        {/* --- TOOLS --- */}
+        {/* New Canvas Button */}
+        <button onClick={handleNewCanvas} title="New Canvas" style={{ padding: '10px 15px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+           📄 New
+        </button>
+
+        <button onClick={onSave} title="Save JSON" style={{ padding: '10px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+           {isDirty ? '💾 *' : '💾'} 
+        </button>
         <button onClick={onLoadClick} title="Load JSON" style={{ padding: '10px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>📂</button>
         <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".json" onChange={handleFileUpload} />
+        
         <button onClick={onDownloadImage} title="Export PNG" style={{ padding: '10px 15px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>📷</button>
         <button onClick={loadDemo} title="Load Example" style={{ padding: '10px 15px', backgroundColor: '#6f42c1', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>🚀</button>
       </div>
@@ -286,11 +331,11 @@ function Flowchart() {
             nodes={nodes} 
             edges={edges} 
             nodeTypes={nodeTypes} 
-            onNodesChange={onNodesChange} 
-            onEdgesChange={onEdgesChange} 
+            onNodesChange={onNodesChangeWrapped} // Wrapped
+            onEdgesChange={onEdgesChangeWrapped} // Wrapped
             onNodeClick={(_, n) => { setSelectedNodeId(n.id); setEditorOpen(true); }} 
             onPaneClick={() => setSelectedNodeId(null)} 
-            onConnect={(p) => setEdges((eds) => addEdge(p, eds))} 
+            onConnect={onConnectWrapped}         // Wrapped
             fitView 
             minZoom={0.1}
         >
@@ -298,11 +343,12 @@ function Flowchart() {
           <Controls />
         </ReactFlow>
 
+        {/* We wrap setNodes/setEdges here so EditorPanel changes also trigger 'Dirty' state */}
         <EditorPanel 
             nodes={nodes} 
             edges={edges} 
-            setNodes={setNodes} 
-            setEdges={setEdges} 
+            setNodes={(val: any) => { setNodes(val); setIsDirty(true); }} 
+            setEdges={(val: any) => { setEdges(val); setIsDirty(true); }} 
             selectedNodeId={selectedNodeId} 
             onSelectNode={setSelectedNodeId} 
             isOpen={editorOpen} 
