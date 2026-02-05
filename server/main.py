@@ -1,7 +1,6 @@
-# server/main.py
 import os
 import json
-import logging # <--- 1. Import Logging
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -9,7 +8,6 @@ from google import genai
 from google.genai import types
 from schemas import Flowchart, PromptRequest
 
-# 2. Configure Logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -28,18 +26,28 @@ client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 @app.post("/generate", response_model=Flowchart)
 async def generate_flow(request: PromptRequest):
-    # 3. Log the incoming request
-    logger.info(f"Received prompt: {request.prompt}")
+    logger.info(f"Received prompt: {request.prompt} | Mode: {request.mode}")
 
-    system_prompt = """
-    You are a flowchart architect. Output pure JSON.
-    1. Nodes must have 'data': {'label': '...'} and 'position': {'x': 0, 'y': 0}.
-    2. 'type' should be 'default'.
-    3. Edges must link valid node IDs.
-    4. Set 'directed' to true for process flows (arrows), false for mind maps (lines).
-    """
+    # 1. Select the Strategy based on Mode
+    if request.mode == "system":
+        system_instruction = """
+        You are a System Architecture Expert. Output pure JSON.
+        1. Identify high-level components (e.g., 'Frontend', 'Backend', 'Database') and create them as Container Nodes.
+        2. Create sub-components inside them using the 'parentId' field.
+        3. Container Nodes must have 'type': 'group'. (Standard nodes are 'default').
+        4. Use 'directed': true for data flow.
+        5. CONSTRAINT: Do not create more than 5 direct children per container. Group excess items into logical sub-groups if necessary.
+        """
+    else:
+        system_instruction = """
+        You are a Flowchart Architect. Output pure JSON.
+        1. Create a logical step-by-step flow.
+        2. Use 'type': 'default' for all nodes.
+        3. Do not use parentId.
+        4. CONSTRAINT: Keep the tree balanced. If a node has >5 children, introduce an intermediate category node to group them.
+        """
 
-    # 4. Update Schema to include 'directed'
+    # 2. Update Schema
     json_schema = {
         "type": "object",
         "properties": {
@@ -50,6 +58,7 @@ async def generate_flow(request: PromptRequest):
                     "properties": {
                         "id": {"type": "string"},
                         "type": {"type": "string"},
+                        "parentId": {"type": "string"},
                         "data": {
                             "type": "object",
                             "properties": {"label": {"type": "string"}},
@@ -73,7 +82,7 @@ async def generate_flow(request: PromptRequest):
                         "source": {"type": "string"},
                         "target": {"type": "string"},
                         "label": {"type": "string"},
-                        "directed": {"type": "boolean"} # <--- Added this
+                        "directed": {"type": "boolean"}
                     },
                     "required": ["id", "source", "target", "directed"]
                 }
@@ -86,7 +95,7 @@ async def generate_flow(request: PromptRequest):
         model="gemini-2.5-flash-lite", 
         contents=request.prompt,
         config=types.GenerateContentConfig(
-            system_instruction=system_prompt,
+            system_instruction=system_instruction,
             response_mime_type="application/json",
             response_schema=json_schema, 
         )
@@ -94,8 +103,7 @@ async def generate_flow(request: PromptRequest):
     
     try:
         if response.text:
-            # 5. Log the raw AI output for debugging
-            logger.info(f"AI Response: {response.text}") 
+            logger.info(f"AI Response: {response.text}")
             data = json.loads(response.text)
             return data
         else:
