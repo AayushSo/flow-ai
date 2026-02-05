@@ -2,21 +2,26 @@ import { Handle, Position, NodeResizer } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 
 // --- 1. The Smart Node ---
-export function SmartNode({ data, selected }: NodeProps) {
-  const hasBody = data.body && typeof data.body === 'string' && data.body.trim().length > 0;
-  // FIX: Read color from data.backgroundColor
-  const bgColor = (data.backgroundColor as string) || '#ffffff';
+export function SmartNode(props: NodeProps) {
+  // 🔨 THE HAMMER: Cast data to 'any' immediately. 
+  // This bypasses the "unknown" error completely.
+  const safeData = props.data as any;
 
+  const label = String(safeData.label || 'Node');
+  const body = String(safeData.body || '');
+  const hasBody = body.trim().length > 0;
+  const bgColor = String(safeData.backgroundColor || '#ffffff');
+  
   return (
     <div 
       style={{ 
         backgroundColor: bgColor, 
-        border: selected ? '2px solid #007bff' : '1px solid #333', 
+        border: props.selected ? '2px solid #007bff' : '1px solid #333', 
         borderRadius: '5px',
         width: '100%',         
         height: 'auto',        
         minHeight: '100%',     
-        boxShadow: selected ? '0 4px 12px rgba(0,123,255,0.3)' : '0 2px 5px rgba(0,0,0,0.1)',
+        boxShadow: props.selected ? '0 4px 12px rgba(0,123,255,0.3)' : '0 2px 5px rgba(0,0,0,0.1)',
         fontSize: '12px',
         color: '#222',
         textAlign: 'center',
@@ -27,7 +32,7 @@ export function SmartNode({ data, selected }: NodeProps) {
     >
       <NodeResizer 
         color="#007bff" 
-        isVisible={selected} 
+        isVisible={props.selected} 
         minWidth={100} 
         minHeight={40} 
       />
@@ -41,8 +46,7 @@ export function SmartNode({ data, selected }: NodeProps) {
         backgroundColor: 'rgba(0,0,0,0.05)', 
         borderBottom: hasBody ? '1px solid rgba(0,0,0,0.1)' : 'none'
       }}>
-        {/* NUCLEAR FIX: Wrap in String() to force type compatibility */}
-        {String(data.label)}
+        {label}
       </div>
 
       {/* Body */}
@@ -56,8 +60,7 @@ export function SmartNode({ data, selected }: NodeProps) {
           flex: 1, 
           overflowY: 'auto' 
         }}>
-           {/* NUCLEAR FIX: Wrap in String() */}
-          {String(data.body)}
+          {body}
         </div>
       )}
 
@@ -67,21 +70,24 @@ export function SmartNode({ data, selected }: NodeProps) {
 }
 
 // --- 2. The Group Node ---
-export function GroupNode({ data, selected }: NodeProps) {
-  const bgColor = (data.backgroundColor as string) || 'rgba(240, 240, 240, 0.4)';
+export function GroupNode(props: NodeProps) {
+  // 🔨 THE HAMMER AGAIN
+  const safeData = props.data as any;
+  const label = String(safeData.label || 'Group');
+  const bgColor = String(safeData.backgroundColor || 'rgba(240, 240, 240, 0.4)');
 
   return (
     <div style={{ 
       width: '100%', 
       height: '100%', 
       backgroundColor: bgColor, 
-      border: selected ? '2px dashed #007bff' : '2px dashed #aaa', 
+      border: props.selected ? '2px dashed #007bff' : '2px dashed #aaa', 
       borderRadius: '8px',
       position: 'relative'
     }}>
       <NodeResizer 
         color="#007bff" 
-        isVisible={selected} 
+        isVisible={props.selected} 
         minWidth={200} 
         minHeight={100} 
       />
@@ -103,8 +109,7 @@ export function GroupNode({ data, selected }: NodeProps) {
         zIndex: 5,
         whiteSpace: 'nowrap'
       }}>
-         {/* NUCLEAR FIX: Wrap in String() */}
-        {String(data.label)}
+        {label}
       </div>
     </div>
   );
