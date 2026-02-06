@@ -206,23 +206,30 @@ function Flowchart() {
   const handleGenerate = async () => {
     if (!prompt) return;
     setLoading(true);
+    
+    // 1. SNAPSHOT: Preserve current state
+    const oldNodesMap = new Map(nodes.map(n => [n.id, n]));
+
     try {
       const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+      // We send the current graph so the AI knows what text/nodes you already have
       const res = await axios.post(`${API_URL}/generate`, { 
         prompt, mode, current_graph: nodes.length > 0 ? { nodes, edges } : null 
       });
 
       const oldNodeIds = new Set(nodes.map(n => n.id));
+      
       const processedNodes = res.data.nodes.map((node: any) => {
         const isGroup = node.type === 'group';
         const isNew = !oldNodeIds.has(node.id);
+        
         return {
             ...node,
             type: isGroup ? 'group' : 'smart', 
             data: { 
               label: node.data.label,
-              body: node.data.body || "",
-              backgroundColor: isNew ? '#d0f0c0' : (node.data.backgroundColor || (isGroup ? 'rgba(240, 240, 240, 0.4)' : '#ffffff'))
+              body: node.data.body || "", // Default to empty if AI sends nothing
+              backgroundColor: isNew ? '#d0f0c0' : (node.data.backgroundColor || '#ffffff')
             }, 
             style: isGroup ? { width: 100, height: 100, zIndex: -1 } : {}
         };
@@ -230,20 +237,46 @@ function Flowchart() {
 
       const processedEdges = res.data.edges.map((edge: any) => ({
         ...edge,
+        // --- FIX 1: Apply the current global Edge Style (Curved/Right-Angle) ---
+        type: edgeStyle, 
         markerEnd: { type: MarkerType.ArrowClosed },
         style: { strokeWidth: 2 }
       }));
 
-      const { nodes: lNodes, edges: lEdges } = getLayoutedElements(processedNodes, processedEdges);
-      setNodes(lNodes);
+      // 3. LAYOUT
+      const { nodes: layoutedNodes, edges: lEdges } = getLayoutedElements(processedNodes, processedEdges);
+
+      // 4. SMART MERGE
+      const finalNodes = layoutedNodes.map((node) => {
+          const oldNode = oldNodesMap.get(node.id);
+          if (oldNode) {
+              return {
+                  ...node,
+                  position: oldNode.position, 
+                  data: {
+                      ...node.data,
+                      // --- FIX 2: Preserve User's Body Text ---
+                      // If the AI returned an empty body (common), keep the user's old body.
+                      body: node.data.body || oldNode.data.body, 
+                      backgroundColor: oldNode.data.backgroundColor 
+                  }
+              };
+          }
+          return node;
+      });
+
+      setNodes(finalNodes);
       setEdges(lEdges);
-      addToHistory(lNodes, lEdges);
+      addToHistory(finalNodes, lEdges);
       setIsDirty(true);
-      setTimeout(() => fitView(), 100);
+      
+      if (nodes.length === 0) {
+          setTimeout(() => fitView(), 100);
+      }
+      
     } catch (error) { console.error(error); alert("Error generating flow"); }
     setLoading(false);
   };
-
   const loadDemo = () => {
     if (nodes.length > 0 && isDirty && !window.confirm("Discard changes?")) return;
     const { nodes: dNodes, edges: dEdges } = getDemoData();

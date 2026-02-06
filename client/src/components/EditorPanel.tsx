@@ -1,7 +1,9 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
+import { MarkerType } from '@xyflow/react';
 
-export function EditorPanel({ nodes, setNodes, setEdges, selectedNodeId, isOpen, toggleOpen }: any) {
+export function EditorPanel({ nodes, setNodes, edges, setEdges, selectedNodeId, isOpen, toggleOpen }: any) {
     const colorInputRef = useRef<HTMLInputElement>(null);
+    const [connectTargetId, setConnectTargetId] = useState("");
 
     // 1. If panel is closed, show a small toggle button
     if (!isOpen) {
@@ -15,9 +17,15 @@ export function EditorPanel({ nodes, setNodes, setEdges, selectedNodeId, isOpen,
       );
     }
   
-    // 2. Find the selected node
+    // 2. Prepare Data
     const selectedNode = nodes.find((n: any) => n.id === selectedNodeId);
-  
+    
+    // --- RESTORED LOGIC ---
+    // Filter nodes to find potential targets (excluding self)
+    const otherNodes = nodes.filter((n: any) => n.id !== selectedNodeId);
+    // Find lines going OUT from this node
+    const outgoingEdges = edges.filter((e: any) => e.source === selectedNodeId);
+
     // 3. Helper to update node data
     const updateNode = (field: string, value: any) => {
       setNodes((nds: any[]) => nds.map((n) => {
@@ -29,21 +37,40 @@ export function EditorPanel({ nodes, setNodes, setEdges, selectedNodeId, isOpen,
     };
 
     // 4. Helper to delete the node
-    const handleDelete = () => {
+    const handleDeleteNode = () => {
         if(!window.confirm("Delete this node?")) return;
         setNodes((nds: any[]) => nds.filter((n) => n.id !== selectedNodeId));
         setEdges((eds: any[]) => eds.filter((e) => e.source !== selectedNodeId && e.target !== selectedNodeId));
         toggleOpen(); 
     };
 
+    // --- NEW: Connection Helpers ---
+    const handleAddEdge = () => {
+        if (!connectTargetId) return;
+        const newEdge = {
+            id: `manual-e-${Date.now()}`,
+            source: selectedNodeId,
+            target: connectTargetId,
+            type: 'default', // You could pass 'smoothstep' prop here if you wanted
+            markerEnd: { type: MarkerType.ArrowClosed },
+            style: { stroke: '#333', strokeWidth: 2 }
+        };
+        setEdges((eds: any[]) => [...eds, newEdge]);
+        setConnectTargetId(""); // Reset dropdown
+    };
+
+    const handleDeleteEdge = (edgeId: string) => {
+        setEdges((eds: any[]) => eds.filter((e) => e.id !== edgeId));
+    };
+
     // --- COLOR PALETTE ---
     const presetColors = [
         '#ffffff', // White
         '#ffcccb', // Red
-        '#c1e1c1', // Green (Safe)
+        '#c1e1c1', // Green
         '#add8e6', // Blue
         '#f0e68c', // Yellow
-        '#e6d2b5', // Light Coffee
+        '#e6d2b5', // Coffee
         '#e6e6fa', // Lavender
     ];
   
@@ -59,7 +86,8 @@ export function EditorPanel({ nodes, setNodes, setEdges, selectedNodeId, isOpen,
         </div>
   
         {selectedNode ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', flex: 1 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', flex: 1, overflowY: 'auto' }}>
+             
              {/* Label Input */}
              <div>
                 <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#666' }}>Label</label>
@@ -75,8 +103,6 @@ export function EditorPanel({ nodes, setNodes, setEdges, selectedNodeId, isOpen,
              <div>
                 <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#666' }}>Color</label>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    
-                    {/* Presets */}
                     {presetColors.map(c => (
                         <div 
                             key={c} 
@@ -86,39 +112,79 @@ export function EditorPanel({ nodes, setNodes, setEdges, selectedNodeId, isOpen,
                                 backgroundColor: c, 
                                 border: selectedNode.data.backgroundColor === c ? '2px solid #333' : '1px solid #ddd', 
                                 cursor: 'pointer', borderRadius: '50%',
-                                transition: 'transform 0.1s',
                                 boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                             }}
-                            title={c}
                         ></div>
                     ))}
-
-                    {/* Rainbow / Custom Button */}
                     <div 
                         onClick={() => colorInputRef.current?.click()}
                         style={{
                             width: '32px', height: '32px',
                             background: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #a18cd1 100%)',
-                            border: '1px solid #ddd',
-                            borderRadius: '50%',
-                            cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                            border: '1px solid #ddd', borderRadius: '50%', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
                         }}
-                        title="Custom Color"
                     >
                         <span style={{ fontSize: '12px' }}>🎨</span>
                     </div>
-
-                    {/* Hidden Native Input */}
                     <input 
-                        ref={colorInputRef}
-                        type="color" 
+                        ref={colorInputRef} type="color" 
                         value={selectedNode.data.backgroundColor || '#ffffff'} 
                         onChange={(e) => updateNode('backgroundColor', e.target.value)}
                         style={{ display: 'none' }}
                     />
                 </div>
+             </div>
+
+             {/* --- RESTORED: Connections Section --- */}
+             <div>
+                 <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#666' }}>Connections (Outgoing)</label>
+                 <div style={{ background: '#f9f9f9', padding: '10px', borderRadius: '6px', border: '1px solid #eee' }}>
+                     
+                     {/* List Existing */}
+                     <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 10px 0' }}>
+                         {outgoingEdges.length === 0 && <li style={{ fontSize: '12px', color: '#999', fontStyle: 'italic' }}>No outgoing connections</li>}
+                         {outgoingEdges.map((edge: any) => {
+                             const targetNode = nodes.find((n: any) => n.id === edge.target);
+                             return (
+                                 <li key={edge.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px', fontSize: '13px' }}>
+                                     <span>→ {targetNode?.data.label || 'Unknown Node'}</span>
+                                     <button 
+                                        onClick={() => handleDeleteEdge(edge.id)}
+                                        style={{ color: '#dc3545', background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}
+                                        title="Remove Connection"
+                                     >×</button>
+                                 </li>
+                             );
+                         })}
+                     </ul>
+
+                     {/* Add New */}
+                     <div style={{ display: 'flex', gap: '5px' }}>
+                         <select 
+                            value={connectTargetId} 
+                            onChange={(e) => setConnectTargetId(e.target.value)}
+                            style={{ flex: 1, padding: '5px', fontSize: '12px', borderRadius: '4px', border: '1px solid #ccc' }}
+                         >
+                             <option value="">+ Connect to...</option>
+                             {otherNodes.map((n: any) => (
+                                 <option key={n.id} value={n.id}>
+                                     {n.data.label.substring(0, 20)}{n.data.label.length > 20 ? '...' : ''}
+                                 </option>
+                             ))}
+                         </select>
+                         <button 
+                            onClick={handleAddEdge}
+                            disabled={!connectTargetId}
+                            style={{ 
+                                padding: '5px 10px', backgroundColor: connectTargetId ? '#007bff' : '#ccc', 
+                                color: 'white', border: 'none', borderRadius: '4px', cursor: connectTargetId ? 'pointer' : 'default', fontSize: '12px' 
+                            }}
+                         >
+                             Add
+                         </button>
+                     </div>
+                 </div>
              </div>
 
              {/* Description (Body) */}
@@ -134,7 +200,7 @@ export function EditorPanel({ nodes, setNodes, setEdges, selectedNodeId, isOpen,
 
              {/* Delete Button */}
              <button 
-                onClick={handleDelete}
+                onClick={handleDeleteNode}
                 style={{ 
                     marginTop: '10px', padding: '10px', backgroundColor: '#fff0f0', 
                     color: '#d9534f', border: '1px solid #fabebb', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' 
