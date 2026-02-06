@@ -1,7 +1,8 @@
 import os
 import json
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
+import re
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from google import genai
@@ -116,24 +117,54 @@ async def generate_flow(request: PromptRequest):
         },
         "required": ["nodes", "edges"]
     }
-
-    response = client.models.generate_content(
-        model="gemini-2.5-flash-lite", 
-        contents=request.prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=system_instruction,
-            response_mime_type="application/json",
-            response_schema=json_schema, 
-        )
-    )
     
     try:
+        # 1. Make the API Call (Wrapped to catch Rate Limits)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash-lite", 
+            contents=request.prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                response_mime_type="application/json",
+                response_schema=json_schema, 
+            )
+        )
+    except Exception as e:
+        # Check for the Rate Limit (429) error
+        error_str = str(e)
+        if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+            logger.warning(f"Rate Limit Hit: {e}")
+            # Return a real 429 status so the frontend can show the "Wait 10s" alert
+            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+        
+        logger.error(f"AI Generation Error: {e}")
+        raise HTTPException(status_code=500, detail="AI service failed")
+
+    # 2. Parse the JSON (With Robust Cleanup)
+    try:
         if response.text:
-            logger.info("AI Response received.")
-            data = json.loads(response.text)
+            raw_text = response.text
+            
+            # A. Strip Markdown code fences (e.g. ```json ... ```)
+            cleaned_text = raw_text.replace('```json', '').replace('```', '').strip()
+
+            # B. Attempt to parse
+            try:
+                data = json.loads(cleaned_text)
+            except json.JSONDecodeError:
+                logger.warning("JSON Decode Error - Attempting newline repair")
+                # C. Fallback: Fix unescaped newlines inside strings
+                # This replaces actual newlines with \n, allowing the parser to work
+                # Note: This is a brute-force fix that usually saves the day for long text blocks
+                cleaned_text = cleaned_text.replace('\n', '\\n')
+                data = json.loads(cleaned_text, strict=False)
+
+            logger.info("AI Response parsed successfully.")
             return data
         else:
             return {"nodes": [], "edges": []}
+
     except Exception as e:
-        logger.error(f"Error parsing JSON: {e}")
+        logger.error(f"Final JSON Parsing Failed: {e}")
+        # Return empty graph instead of crashing
         return {"nodes": [], "edges": []}
