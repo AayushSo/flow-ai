@@ -25,6 +25,7 @@ interface ControlBarProps {
   onExport: () => void;
   onLoadDemo: () => void;
   isDirty: boolean;
+  onAddNode: () => void;
 }
 
 export function ControlBar(props: ControlBarProps) {
@@ -83,7 +84,14 @@ export function ControlBar(props: ControlBarProps) {
       )}
 
       <div style={{ width: '1px', height: '30px', background: '#ddd', margin: '0 5px' }}></div>
-      
+	{/* --- NEW: Add Node Button --- */}
+      <button 
+        onClick={props.onAddNode} 
+        title="Add Manual Node" 
+        style={{ padding: '8px 12px', backgroundColor: 'white', color: '#333', border: '1px solid #ccc', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}
+      >
+        + Node
+      </button>      
       {/* Edge Style Toggle */}
       <button 
         onClick={props.onToggleEdgeStyle} 

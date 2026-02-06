@@ -52,7 +52,7 @@ function Flowchart() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   
-  const { fitView, getNodes, toObject, setViewport } = useReactFlow();
+  const { fitView, getNodes, toObject } = useReactFlow();
   
   const nodeTypes = useMemo(() => ({ smart: SmartNode, group: GroupNode }), []);
 
@@ -92,7 +92,22 @@ function Flowchart() {
     setEdges((eds) => addEdge(newEdge, eds)); // Fix applied
     setIsDirty(true);
   }, [setEdges, edgeStyle]);
-
+	// --- NEW: Handle Manual Add ---
+  const handleAddNode = () => {
+    const id = `manual-${Date.now()}`;
+    const newNode: Node = {
+        id,
+        type: 'smart', // Defaults to smart node
+        position: { x: window.innerWidth / 2 - 100, y: window.innerHeight / 2 - 50 }, // Center-ish
+        data: { 
+            label: 'New Node', 
+            body: 'Description', 
+            backgroundColor: '#ffffff' 
+        }
+    };
+    setNodes((nds) => nds.concat(newNode));
+    setIsDirty(true);
+  };
   const onReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
       setEdges((els) => reconnectEdge(oldEdge, newConnection, els));
       setIsDirty(true);
@@ -275,7 +290,8 @@ function Flowchart() {
             setEdges={(val: any) => { setEdges(val); setIsDirty(true); }} 
             selectedNodeId={selectedNodeId} 
             isOpen={editorOpen} toggleOpen={() => setEditorOpen(!editorOpen)} 
-        />
+			onAddNode={handleAddNode} // <-- Pass it here
+		/>
       </div>
     </div>
   );
