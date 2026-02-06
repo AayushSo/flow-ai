@@ -182,45 +182,86 @@ function Flowchart() {
     e.target.value = ''; 
   };
 
-  const onDownloadImage = () => {
-    const nodesBounds = getNodesBounds(getNodes());
-    const padding = 300; 
-    const viewportElem = document.querySelector('.react-flow__viewport') as HTMLElement;
-    
-    if (viewportElem) {
-        toPng(viewportElem, {
-            backgroundColor: '#ffffff',
-            width: nodesBounds.width + padding,
-            height: nodesBounds.height + padding,
-            style: {
-                width: `${nodesBounds.width + padding}px`,
-                height: `${nodesBounds.height + padding}px`,
-                transform: `translate(${-nodesBounds.x + (padding/2)}px, ${-nodesBounds.y + (padding/2)}px) scale(1)`
-            },
-            filter: (node) => {
-              // Keep your existing filter for handles
-              if (node.classList && node.classList.contains('react-flow__handle')) {
-                return false;
-              }
-              return true;
-            },
-            // --- NEW: Remove "selected" class from the snapshot ---
-            onClone: (clonedNode) => {
-                // Find any node/edge in the CLONE that has the 'selected' class
-                const selectedElements = (clonedNode as HTMLElement).querySelectorAll('.selected');
-                
-                selectedElements.forEach((el) => {
-                    el.classList.remove('selected');
-                });
-            }
-        }).then((dataUrl) => {
-            const a = document.createElement('a');
-            a.download = `flowchart-${Date.now()}.png`;
-            a.href = dataUrl;
-            a.click();
-        });
+  const onDownloadImage = async () => {
+    // 1. Define this OUTSIDE the try block so 'finally' can see it
+    let previouslySelectedIds: string[] = [];
+
+    try {
+      // 2. Record currently selected nodes
+      previouslySelectedIds = nodes.filter((n) => n.selected).map((n) => n.id);
+
+      // 3. Deselect everything to clear the Blue Glow
+      if (previouslySelectedIds.length > 0) {
+        setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
+        // Wait 50ms for the DOM to update and CSS transitions (fading) to finish
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+
+      // 4. Calculate Bounds
+      const nodesBounds = getNodesBounds(getNodes());
+      const padding = 100;
+      const viewportElem = document.querySelector('.react-flow__viewport') as HTMLElement;
+
+      if (!viewportElem) return;
+
+      // 5. Generate Image
+      const dataUrl = await toPng(viewportElem, {
+        backgroundColor: '#ffffff',
+        width: nodesBounds.width + padding,
+        height: nodesBounds.height + padding,
+        style: {
+          width: `${nodesBounds.width + padding}px`,
+          height: `${nodesBounds.height + padding}px`,
+          transform: `translate(${-nodesBounds.x + (padding / 2)}px, ${-nodesBounds.y + (padding / 2)}px) scale(1)`,
+        },
+        filter: (node) => {
+          // Filter out handles
+          if (node.classList && node.classList.contains('react-flow__handle')) return false;
+          return true;
+        },
+        onClone: (clonedNode) => {
+          const node = clonedNode as HTMLElement;
+
+          // --- FIX: BLACK BOXES (Force White Background) ---
+          node.querySelectorAll('.react-flow__edge-textbg').forEach((el) => {
+            el.setAttribute('fill', '#ffffff');
+            (el as HTMLElement).style.fill = '#ffffff';
+          });
+
+          // --- FIX: INVISIBLE EDGES (Force Dark Lines) ---
+          node.querySelectorAll('.react-flow__edge-path').forEach((el) => {
+            (el as HTMLElement).style.stroke = '#333333';
+            (el as HTMLElement).style.strokeOpacity = '1';
+          });
+
+          // --- FIX: TEXT COLOR (Force Black) ---
+          node.querySelectorAll('.react-flow__edge-text').forEach((el) => {
+            (el as HTMLElement).style.fill = '#000000';
+          });
+        },
+      });
+
+      // 6. Download
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `flowchart-${Date.now()}.png`;
+      a.click();
+
+    } catch (err) {
+      console.error('Export failed', err);
+    } finally {
+      // 7. RESTORE SELECTION (This puts the blue glow back for the user)
+      if (previouslySelectedIds.length > 0) {
+        setNodes((nds) =>
+          nds.map((n) => ({
+            ...n,
+            selected: previouslySelectedIds.includes(n.id),
+          }))
+        );
+      }
     }
   };
+  
   
   const handleGenerate = async () => {
     if (!prompt) return;
