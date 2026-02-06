@@ -268,6 +268,7 @@ function Flowchart() {
         onSave={onSave} onLoadFile={handleFileUpload}
         onExport={onDownloadImage} onLoadDemo={loadDemo}
         isDirty={isDirty}
+		onAddNode={handleAddNode}
       />
 
       <div style={{ flex: 1, width: '100%', position: 'relative', background: '#fafafa' }}>

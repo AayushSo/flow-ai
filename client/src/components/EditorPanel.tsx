@@ -1,6 +1,8 @@
-import React from 'react';
+import { useRef } from 'react';
 
-export function EditorPanel({ nodes, edges, setNodes, setEdges, selectedNodeId, isOpen, toggleOpen }: any) {
+export function EditorPanel({ nodes, setNodes, setEdges, selectedNodeId, isOpen, toggleOpen }: any) {
+    const colorInputRef = useRef<HTMLInputElement>(null);
+
     // 1. If panel is closed, show a small toggle button
     if (!isOpen) {
       return (
@@ -15,8 +17,6 @@ export function EditorPanel({ nodes, edges, setNodes, setEdges, selectedNodeId, 
   
     // 2. Find the selected node
     const selectedNode = nodes.find((n: any) => n.id === selectedNodeId);
-    const otherNodes = nodes.filter((n: any) => n.id !== selectedNodeId);
-    const outgoingEdges = edges.filter((e: any) => e.source === selectedNodeId);
   
     // 3. Helper to update node data
     const updateNode = (field: string, value: any) => {
@@ -31,14 +31,21 @@ export function EditorPanel({ nodes, edges, setNodes, setEdges, selectedNodeId, 
     // 4. Helper to delete the node
     const handleDelete = () => {
         if(!window.confirm("Delete this node?")) return;
-        
-        // Remove node
         setNodes((nds: any[]) => nds.filter((n) => n.id !== selectedNodeId));
-        // Remove connected edges
         setEdges((eds: any[]) => eds.filter((e) => e.source !== selectedNodeId && e.target !== selectedNodeId));
-        
-        toggleOpen(); // Close panel
+        toggleOpen(); 
     };
+
+    // --- COLOR PALETTE ---
+    const presetColors = [
+        '#ffffff', // White
+        '#ffcccb', // Red
+        '#c1e1c1', // Green (Safe)
+        '#add8e6', // Blue
+        '#f0e68c', // Yellow
+        '#e6d2b5', // Light Coffee
+        '#e6e6fa', // Lavender
+    ];
   
     return (
       <div style={{ 
@@ -67,17 +74,50 @@ export function EditorPanel({ nodes, edges, setNodes, setEdges, selectedNodeId, 
              {/* Background Color */}
              <div>
                 <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#666' }}>Color</label>
-                <div style={{ display: 'flex', gap: '5px' }}>
-                    <input 
-                    type="color" 
-                    value={selectedNode.data.backgroundColor || '#ffffff'} 
-                    onChange={(e) => updateNode('backgroundColor', e.target.value)}
-                    style={{ width: '40px', height: '40px', border: 'none', cursor: 'pointer' }}
-                    />
-                    {/* Quick Colors */}
-                    {['#ffffff', '#ffcccb', '#d0f0c0', '#add8e6', '#f0e68c'].map(c => (
-                        <div key={c} onClick={() => updateNode('backgroundColor', c)} style={{ width: '30px', height: '30px', backgroundColor: c, border: '1px solid #ccc', cursor: 'pointer', borderRadius: '4px' }}></div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    
+                    {/* Presets */}
+                    {presetColors.map(c => (
+                        <div 
+                            key={c} 
+                            onClick={() => updateNode('backgroundColor', c)} 
+                            style={{ 
+                                width: '32px', height: '32px', 
+                                backgroundColor: c, 
+                                border: selectedNode.data.backgroundColor === c ? '2px solid #333' : '1px solid #ddd', 
+                                cursor: 'pointer', borderRadius: '50%',
+                                transition: 'transform 0.1s',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                            }}
+                            title={c}
+                        ></div>
                     ))}
+
+                    {/* Rainbow / Custom Button */}
+                    <div 
+                        onClick={() => colorInputRef.current?.click()}
+                        style={{
+                            width: '32px', height: '32px',
+                            background: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #a18cd1 100%)',
+                            border: '1px solid #ddd',
+                            borderRadius: '50%',
+                            cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                        }}
+                        title="Custom Color"
+                    >
+                        <span style={{ fontSize: '12px' }}>🎨</span>
+                    </div>
+
+                    {/* Hidden Native Input */}
+                    <input 
+                        ref={colorInputRef}
+                        type="color" 
+                        value={selectedNode.data.backgroundColor || '#ffffff'} 
+                        onChange={(e) => updateNode('backgroundColor', e.target.value)}
+                        style={{ display: 'none' }}
+                    />
                 </div>
              </div>
 
@@ -87,7 +127,7 @@ export function EditorPanel({ nodes, edges, setNodes, setEdges, selectedNodeId, 
                 <textarea 
                   value={selectedNode.data.body || ''}
                   onChange={(e) => updateNode('body', e.target.value)}
-                  style={{ flex: 1, width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', resize: 'none' }}
+                  style={{ flex: 1, width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', resize: 'none', fontFamily: 'inherit' }}
                   placeholder="Add details here..."
                 />
              </div>
@@ -96,8 +136,8 @@ export function EditorPanel({ nodes, edges, setNodes, setEdges, selectedNodeId, 
              <button 
                 onClick={handleDelete}
                 style={{ 
-                    marginTop: '10px', padding: '10px', backgroundColor: '#dc3545', 
-                    color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' 
+                    marginTop: '10px', padding: '10px', backgroundColor: '#fff0f0', 
+                    color: '#d9534f', border: '1px solid #fabebb', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' 
                 }}
              >
                 🗑️ Delete Node
