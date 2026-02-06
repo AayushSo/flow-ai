@@ -214,7 +214,7 @@ function Flowchart() {
           height: `${nodesBounds.height + padding}px`,
           transform: `translate(${-nodesBounds.x + (padding / 2)}px, ${-nodesBounds.y + (padding / 2)}px) scale(1)`,
         },
-        filter: (node) => {
+        filter: (node: any) => {
           // Filter out handles
           if (node.classList && node.classList.contains('react-flow__handle')) return false;
           return true;
