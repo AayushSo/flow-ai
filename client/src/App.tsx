@@ -9,8 +9,7 @@ import {
   ReactFlowProvider,
   addEdge,
   useReactFlow,
-  getNodesBounds
-  ,
+  getNodesBounds,
   // Panel,  <-- REMOVE THIS (Fixes TS6133)
   type Node,      // <-- ADD THIS
   type Edge       // <-- ADD THIS
@@ -43,7 +42,8 @@ function Flowchart() {
   const [isDirty, setIsDirty] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-
+// --- NEW: Edge Style State ---
+  const [edgeStyle, setEdgeStyle] = useState<'default' | 'smoothstep'>('default');
 //  const [nodes, setNodes, onNodesChange] = useNodesState([]);
 //  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -53,7 +53,17 @@ function Flowchart() {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { fitView, getNodes, toObject, setViewport } = useReactFlow();
-
+// --- NEW: Toggle Function ---
+  const toggleEdgeStyle = () => {
+    const newStyle = edgeStyle === 'default' ? 'smoothstep' : 'default';
+    setEdgeStyle(newStyle);
+    
+    // Update all existing edges immediately
+    setEdges((eds) => eds.map((e) => ({
+      ...e,
+      type: newStyle
+    })));
+  };
   const nodeTypes = useMemo(() => ({
     smart: SmartNode,
     group: GroupNode
@@ -77,9 +87,15 @@ function Flowchart() {
   }, [onEdgesChange]);
 
   const onConnectWrapped = useCallback((params: any) => {
-    setEdges((eds) => addEdge(params, eds));
+    const newEdge = { 
+        ...params, 
+        type: edgeStyle, // NEW: Use current style for new edges
+        markerEnd: { type: MarkerType.ArrowClosed },
+        style: { stroke: '#333', strokeWidth: 2 }
+      };
+	setEdges((eds) => addEdge(params, eds));
     setIsDirty(true);
-  }, [setEdges]);
+  }, [setEdges, edgeStyle]);
 
   // --- HISTORY ---
   const addToHistory = (newNodes: any[], newEdges: any[]) => {
@@ -328,7 +344,25 @@ function Flowchart() {
         )}
 
         <div style={{ width: '1px', height: '30px', background: '#ddd', margin: '0 5px' }}></div>
-
+		{/* --- NEW: Edge Style Toggle Button --- */}
+        <button 
+          onClick={toggleEdgeStyle} 
+          title="Toggle Edge Style (Curved / Right-Angle)" 
+          style={{ 
+            padding: '8px 12px', 
+            backgroundColor: 'white', 
+            color: '#333', 
+            border: '1px solid #ccc', 
+            borderRadius: '6px', 
+            cursor: 'pointer',
+            fontSize: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px'
+          }}
+        >
+          {edgeStyle === 'default' ? '⤵ Arrow' : '⮥ Arrow'}
+        </button>
         <button onClick={handleNewCanvas} title="New Canvas" style={{ padding: '10px 15px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>📄</button>
         <button onClick={onSave} title="Save JSON" style={{ padding: '10px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>{isDirty ? '💾 *' : '💾'}</button>
         <button onClick={onLoadClick} title="Load JSON" style={{ padding: '10px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>📂</button>

@@ -3,8 +3,7 @@ import type { NodeProps } from '@xyflow/react';
 
 // --- 1. The Smart Node ---
 export function SmartNode(props: NodeProps) {
-  // 🔨 THE HAMMER: Cast data to 'any' immediately. 
-  // This bypasses the "unknown" error completely.
+  // 🔨 THE HAMMER: Cast data to 'any' for safety
   const safeData = props.data as any;
 
   const label = String(safeData.label || 'Node');
@@ -25,9 +24,10 @@ export function SmartNode(props: NodeProps) {
         fontSize: '12px',
         color: '#222',
         textAlign: 'center',
-        overflow: 'hidden',
+        overflow: 'visible', // Changed to visible so handles on edge don't get clipped
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        position: 'relative'
       }}
     >
       <NodeResizer 
@@ -37,7 +37,11 @@ export function SmartNode(props: NodeProps) {
         minHeight={40} 
       />
 
-      <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
+      {/* --- INPUTS (Targets) --- */}
+      {/* Top Input */}
+      <Handle type="target" position={Position.Top} id="t" style={{ background: '#555', zIndex: 10 }} />
+      {/* Left Input */}
+      <Handle type="target" position={Position.Left} id="l" style={{ background: '#555', zIndex: 10 }} />
       
       {/* Header */}
       <div style={{ 
@@ -64,14 +68,17 @@ export function SmartNode(props: NodeProps) {
         </div>
       )}
 
-      <Handle type="source" position={Position.Bottom} style={{ background: '#555' }} />
+      {/* --- OUTPUTS (Sources) --- */}
+      {/* Bottom Output */}
+      <Handle type="source" position={Position.Bottom} id="b" style={{ background: '#555', zIndex: 10 }} />
+      {/* Right Output */}
+      <Handle type="source" position={Position.Right} id="r" style={{ background: '#555', zIndex: 10 }} />
     </div>
   );
 }
 
 // --- 2. The Group Node ---
 export function GroupNode(props: NodeProps) {
-  // 🔨 THE HAMMER AGAIN
   const safeData = props.data as any;
   const label = String(safeData.label || 'Group');
   const bgColor = String(safeData.backgroundColor || 'rgba(240, 240, 240, 0.4)');
@@ -92,8 +99,11 @@ export function GroupNode(props: NodeProps) {
         minHeight={100} 
       />
 
+      {/* Group nodes usually just need top/bottom to encompass things, but we can add all 4 */}
       <Handle type="target" position={Position.Top} style={{ background: 'transparent', border: 'none', top: -5 }} />
       <Handle type="source" position={Position.Bottom} style={{ background: 'transparent', border: 'none', bottom: -5 }} />
+      <Handle type="target" position={Position.Left} style={{ background: 'transparent', border: 'none', left: -5 }} />
+      <Handle type="source" position={Position.Right} style={{ background: 'transparent', border: 'none', right: -5 }} />
       
       <div style={{ 
         position: 'absolute', 
