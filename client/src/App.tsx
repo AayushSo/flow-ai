@@ -10,9 +10,10 @@ import {
   addEdge,
   useReactFlow,
   getNodesBounds,
-  // Panel,  <-- REMOVE THIS (Fixes TS6133)
-  type Node,      // <-- ADD THIS
-  type Edge       // <-- ADD THIS
+  type Node,      
+  type Edge,      
+  reconnectEdge,
+  type Connection
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import axios from "axios";
@@ -44,8 +45,6 @@ function Flowchart() {
   const [historyIndex, setHistoryIndex] = useState(-1);
 // --- NEW: Edge Style State ---
   const [edgeStyle, setEdgeStyle] = useState<'default' | 'smoothstep'>('default');
-//  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-//  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -93,10 +92,17 @@ function Flowchart() {
         markerEnd: { type: MarkerType.ArrowClosed },
         style: { stroke: '#333', strokeWidth: 2 }
       };
-	setEdges((eds) => addEdge(params, eds));
+	setEdges((eds) => addEdge(newEdge, eds));
     setIsDirty(true);
   }, [setEdges, edgeStyle]);
-
+  // --- NEW: Handle Reconnection (Dragging existing arrows) ---
+  const onReconnect = useCallback(
+    (oldEdge: Edge, newConnection: Connection) => {
+      setEdges((els) => reconnectEdge(oldEdge, newConnection, els));
+      setIsDirty(true);
+    },
+    [setEdges]
+  );
   // --- HISTORY ---
   const addToHistory = (newNodes: any[], newEdges: any[]) => {
     const newHistory = history.slice(0, historyIndex + 1);
@@ -381,6 +387,9 @@ function Flowchart() {
             onNodeClick={(_, n) => { setSelectedNodeId(n.id); setEditorOpen(true); }} 
             onPaneClick={() => setSelectedNodeId(null)} 
             onConnect={onConnectWrapped}
+			// --- NEW: Enable Reconnection ---
+			onReconnect={onReconnect}
+			// --------------------------------
             fitView 
             minZoom={0.1}
         >
