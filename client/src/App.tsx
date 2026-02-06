@@ -184,25 +184,44 @@ function Flowchart() {
 
   const onDownloadImage = () => {
     const nodesBounds = getNodesBounds(getNodes());
+    const padding = 300; 
     const viewportElem = document.querySelector('.react-flow__viewport') as HTMLElement;
+    
     if (viewportElem) {
         toPng(viewportElem, {
             backgroundColor: '#ffffff',
-            width: nodesBounds.width + 100,
-            height: nodesBounds.height + 100,
+            width: nodesBounds.width + padding,
+            height: nodesBounds.height + padding,
             style: {
-                width: `${nodesBounds.width + 100}px`,
-                height: `${nodesBounds.height + 100}px`,
-                transform: `translate(${-nodesBounds.x + 50}px, ${-nodesBounds.y + 50}px) scale(1)`
+                width: `${nodesBounds.width + padding}px`,
+                height: `${nodesBounds.height + padding}px`,
+                transform: `translate(${-nodesBounds.x + (padding/2)}px, ${-nodesBounds.y + (padding/2)}px) scale(1)`
+            },
+            filter: (node) => {
+              // Keep your existing filter for handles
+              if (node.classList && node.classList.contains('react-flow__handle')) {
+                return false;
+              }
+              return true;
+            },
+            // --- NEW: Remove "selected" class from the snapshot ---
+            onClone: (clonedNode) => {
+                // Find any node/edge in the CLONE that has the 'selected' class
+                const selectedElements = (clonedNode as HTMLElement).querySelectorAll('.selected');
+                
+                selectedElements.forEach((el) => {
+                    el.classList.remove('selected');
+                });
             }
         }).then((dataUrl) => {
             const a = document.createElement('a');
             a.download = `flowchart-${Date.now()}.png`;
-            a.href = dataUrl; a.click();
+            a.href = dataUrl;
+            a.click();
         });
     }
   };
-
+  
   const handleGenerate = async () => {
     if (!prompt) return;
     setLoading(true);
@@ -240,7 +259,12 @@ function Flowchart() {
         // --- FIX 1: Apply the current global Edge Style (Curved/Right-Angle) ---
         type: edgeStyle, 
         markerEnd: { type: MarkerType.ArrowClosed },
-        style: { strokeWidth: 2 }
+        style: { 
+            strokeWidth: 2,
+            stroke: '#333' // <--- 1. FIX: Force the line to be dark black/grey
+        },
+        labelBgStyle: { fill: '#ffffff' }, // <--- 2. FIX: Force white background for text
+        labelStyle: { fill: '#000000' },    // <--- 3. FIX: Force text to be black
       }));
 
       // 3. LAYOUT
@@ -288,7 +312,21 @@ function Flowchart() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <ControlBar 
+      {/* --- NEW: Force Styles for Export --- */}
+    <style>
+      {`
+        /* Force edge label backgrounds to be white (Fixes black box) */
+        .react-flow__edge-textbg {
+          fill: #ffffff !important;
+        }
+        /* Ensure text is dark and readable */
+        .react-flow__edge-text {
+          fill: #222222 !important;
+          font-size: 12px;
+        }
+      `}
+    </style>
+	  <ControlBar 
         prompt={prompt} setPrompt={setPrompt}
         onGenerate={handleGenerate} loading={loading}
         mode={mode} setMode={setMode}
