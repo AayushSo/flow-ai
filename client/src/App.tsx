@@ -219,7 +219,7 @@ function Flowchart() {
           if (node.classList && node.classList.contains('react-flow__handle')) return false;
           return true;
         },
-        onClone: (clonedNode) => {
+        onClone: (clonedNode: HTMLElement) => {
           const node = clonedNode as HTMLElement;
 
           // --- FIX: BLACK BOXES (Force White Background) ---
@@ -239,7 +239,7 @@ function Flowchart() {
             (el as HTMLElement).style.fill = '#000000';
           });
         },
-      });
+      } as any);
 
       // 6. Download
       const a = document.createElement('a');
