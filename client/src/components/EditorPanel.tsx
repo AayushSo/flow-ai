@@ -1,10 +1,7 @@
 import { useRef, useState } from 'react';
 import { MarkerType } from '@xyflow/react';
-import { 
-  Database, Server, User, BrainCircuit, Globe, 
-  FileText, Settings, Cloud, Code, AlertCircle, 
-  CheckCircle, HelpCircle, Square, Layers, Diamond 
-} from 'lucide-react';
+// Only import what is used in the Shape Selector buttons
+import { Square, Layers, Diamond } from 'lucide-react';
 
 export function EditorPanel({ nodes, setNodes, edges, setEdges, selectedNodeId, isOpen, toggleOpen }: any) {
     const colorInputRef = useRef<HTMLInputElement>(null);
@@ -121,7 +118,7 @@ export function EditorPanel({ nodes, setNodes, edges, setEdges, selectedNodeId, 
                 />
              </div>
              
-             {/* 2. Subtitle Input (NEW) */}
+             {/* 2. Subtitle Input */}
              <div>
                 <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#666' }}>Subtitle</label>
                 <input 
@@ -133,7 +130,7 @@ export function EditorPanel({ nodes, setNodes, edges, setEdges, selectedNodeId, 
                 />
              </div>
 
-             {/* 3. Shape / Type Selector (NEW) */}
+             {/* 3. Shape / Type Selector */}
              <div>
                 <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#666' }}>Shape</label>
                 <div style={{ display: 'flex', gap: '5px' }}>
@@ -159,7 +156,7 @@ export function EditorPanel({ nodes, setNodes, edges, setEdges, selectedNodeId, 
                 </div>
              </div>
 
-             {/* 4. Icon Selector (NEW) */}
+             {/* 4. Icon Selector */}
              <div>
                 <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#666' }}>Icon</label>
                 <select 

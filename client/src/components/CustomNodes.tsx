@@ -140,9 +140,6 @@ export const DecisionNode = memo(({ data, selected }: CustomNodeProps) => {
   const icon = (data.icon as string) || '';
   const bgColor = (data.backgroundColor as string) || '#fff6e5';
 
-  // Manual positioning style for Diamond handles
-  // We need to override the default 'left/top' of Handles to place them exactly at the compass points
-  const diamondHandleStyle = { background: '#555' };
 
   return (
     <>
