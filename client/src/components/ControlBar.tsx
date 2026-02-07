@@ -100,7 +100,8 @@ export const ControlBar: React.FC<ControlBarProps> = ({
       {/* 1. BRAND */}
       <div style={{ fontWeight: 'bold', fontSize: '18px', marginRight: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
         <span style={{ fontSize: '20px' }}>✨</span>
-        <span style={{ display: 'none', md: 'block' }}>AI Flow</span>
+        {/* FIX: Removed invalid 'md' property and used className instead */}
+        <span className="brand-text">AI Flow</span>
       </div>
 
       {/* 2. PROMPT INPUT */}
@@ -208,6 +209,12 @@ export const ControlBar: React.FC<ControlBarProps> = ({
       <style>{`
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
+        
+        /* Responsive Brand Text */
+        .brand-text { display: none; }
+        @media (min-width: 768px) {
+            .brand-text { display: block; }
+        }
       `}</style>
     </div>
   );
