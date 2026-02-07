@@ -22,7 +22,7 @@ import { toPng } from 'html-to-image';
 // Custom Components
 import { getLayoutedElements } from "./utils/layout";
 import { EditorPanel } from "./components/EditorPanel";
-import { ControlBar } from "./components/ControlBar"; // NEW IMPORT
+import { ControlBar } from "./components/ControlBar"; 
 import { getDemoData } from "./data/demoData";
 import { SmartNode, GroupNode, DecisionNode, LayeredNode } from "./components/CustomNodes";
 
@@ -41,6 +41,9 @@ function Flowchart() {
   const [loading, setLoading] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   
+  // Dark Mode State
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  
   // History
   const [history, setHistory] = useState<any[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -54,7 +57,22 @@ function Flowchart() {
   
   const { fitView, getNodes, toObject } = useReactFlow();
   
-  const nodeTypes = useMemo(() => ({ smart: SmartNode, group: GroupNode,decision: DecisionNode,layered: LayeredNode }), []);
+  const nodeTypes = useMemo(() => ({ smart: SmartNode, group: GroupNode, decision: DecisionNode, layered: LayeredNode }), []);
+
+  // --- HELPER: Toggle Edge Style ---
+  // FIX: This now updates both the "future preference" AND "existing edges"
+  const toggleEdgeStyle = () => {
+    const newStyle = edgeStyle === 'default' ? 'smoothstep' : 'default';
+    setEdgeStyle(newStyle);
+    
+    // Explicitly update all existing edges on the canvas
+    setEdges((eds) => eds.map(e => ({
+      ...e,
+      type: newStyle
+    })));
+    
+    setIsDirty(true);
+  };
 
   // --- HELPERS ---
   const addToHistory = (newNodes: any[], newEdges: any[]) => {
@@ -62,13 +80,6 @@ function Flowchart() {
     newHistory.push({ nodes: newNodes, edges: newEdges });
     setHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
-  };
-
-  // --- HANDLERS ---
-  const toggleEdgeStyle = () => {
-    const newStyle = edgeStyle === 'default' ? 'smoothstep' : 'default';
-    setEdgeStyle(newStyle);
-    setEdges((eds) => eds.map((e) => ({ ...e, type: newStyle })));
   };
 
   const onNodesChangeWrapped = useCallback((changes: any) => {
@@ -81,24 +92,23 @@ function Flowchart() {
     if (changes.length > 0) setIsDirty(true);
   }, [onEdgesChange]);
 
-  // FIX: Applied the fix for unused newEdge here
   const onConnectWrapped = useCallback((params: any) => {
     const newEdge = { 
         ...params, 
         type: edgeStyle, 
         markerEnd: { type: MarkerType.ArrowClosed },
-        style: { stroke: '#333', strokeWidth: 2 }
+        style: { stroke: isDarkMode ? '#aaa' : '#333', strokeWidth: 2 } 
     };
-    setEdges((eds) => addEdge(newEdge, eds)); // Fix applied
+    setEdges((eds) => addEdge(newEdge, eds));
     setIsDirty(true);
-  }, [setEdges, edgeStyle]);
-	// --- NEW: Handle Manual Add ---
+  }, [setEdges, edgeStyle, isDarkMode]);
+
   const handleAddNode = () => {
     const id = `manual-${Date.now()}`;
     const newNode: Node = {
         id,
-        type: 'smart', // Defaults to smart node
-        position: { x: window.innerWidth / 2 - 100, y: window.innerHeight / 2 - 50 }, // Center-ish
+        type: 'smart',
+        position: { x: window.innerWidth / 2 - 100, y: window.innerHeight / 2 - 50 },
         data: { 
             label: 'New Node', 
             body: 'Description', 
@@ -108,6 +118,7 @@ function Flowchart() {
     setNodes((nds) => nds.concat(newNode));
     setIsDirty(true);
   };
+
   const onReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
       setEdges((els) => reconnectEdge(oldEdge, newConnection, els));
       setIsDirty(true);
@@ -134,7 +145,6 @@ function Flowchart() {
     }
   };
 
-  // File & Action Handlers
   const handleNewCanvas = () => {
     if (nodes.length > 0 && isDirty && !window.confirm("Unsaved changes. Create new canvas?")) return;
     setNodes([]); setEdges([]); setHistory([]); setHistoryIndex(-1); setIsDirty(false); setPrompt("");
@@ -183,30 +193,23 @@ function Flowchart() {
   };
 
   const onDownloadImage = async () => {
-    // 1. Define this OUTSIDE the try block so 'finally' can see it
     let previouslySelectedIds: string[] = [];
 
     try {
-      // 2. Record currently selected nodes
       previouslySelectedIds = nodes.filter((n) => n.selected).map((n) => n.id);
-
-      // 3. Deselect everything to clear the Blue Glow
       if (previouslySelectedIds.length > 0) {
         setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
-        // Wait 50ms for the DOM to update and CSS transitions (fading) to finish
         await new Promise((resolve) => setTimeout(resolve, 50));
       }
 
-      // 4. Calculate Bounds
       const nodesBounds = getNodesBounds(getNodes());
       const padding = 100;
       const viewportElem = document.querySelector('.react-flow__viewport') as HTMLElement;
 
       if (!viewportElem) return;
 
-      // 5. Generate Image
       const dataUrl = await toPng(viewportElem, {
-        backgroundColor: '#ffffff',
+        backgroundColor: '#ffffff', // FORCE WHITE BG
         width: nodesBounds.width + padding,
         height: nodesBounds.height + padding,
         style: {
@@ -215,33 +218,24 @@ function Flowchart() {
           transform: `translate(${-nodesBounds.x + (padding / 2)}px, ${-nodesBounds.y + (padding / 2)}px) scale(1)`,
         },
         filter: (node: any) => {
-          // Filter out handles
           if (node.classList && node.classList.contains('react-flow__handle')) return false;
           return true;
         },
         onClone: (clonedNode: HTMLElement) => {
           const node = clonedNode as HTMLElement;
-
-          // --- FIX: BLACK BOXES (Force White Background) ---
-          node.querySelectorAll('.react-flow__edge-textbg').forEach((el) => {
-            el.setAttribute('fill', '#ffffff');
-            (el as HTMLElement).style.fill = '#ffffff';
-          });
-
-          // --- FIX: INVISIBLE EDGES (Force Dark Lines) ---
           node.querySelectorAll('.react-flow__edge-path').forEach((el) => {
             (el as HTMLElement).style.stroke = '#333333';
             (el as HTMLElement).style.strokeOpacity = '1';
           });
-
-          // --- FIX: TEXT COLOR (Force Black) ---
           node.querySelectorAll('.react-flow__edge-text').forEach((el) => {
             (el as HTMLElement).style.fill = '#000000';
+          });
+          node.querySelectorAll('.react-flow__edge-textbg').forEach((el) => {
+            (el as HTMLElement).style.fill = '#ffffff';
           });
         },
       } as any);
 
-      // 6. Download
       const a = document.createElement('a');
       a.href = dataUrl;
       a.download = `flowchart-${Date.now()}.png`;
@@ -250,29 +244,19 @@ function Flowchart() {
     } catch (err) {
       console.error('Export failed', err);
     } finally {
-      // 7. RESTORE SELECTION (This puts the blue glow back for the user)
       if (previouslySelectedIds.length > 0) {
-        setNodes((nds) =>
-          nds.map((n) => ({
-            ...n,
-            selected: previouslySelectedIds.includes(n.id),
-          }))
-        );
+        setNodes((nds) => nds.map((n) => ({ ...n, selected: previouslySelectedIds.includes(n.id) })));
       }
     }
   };
   
-  
   const handleGenerate = async () => {
     if (!prompt) return;
     setLoading(true);
-    
-    // 1. SNAPSHOT: Preserve current state
     const oldNodesMap = new Map(nodes.map(n => [n.id, n]));
 
     try {
       const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-      // We send the current graph so the AI knows what text/nodes you already have
       const res = await axios.post(`${API_URL}/generate`, { 
         prompt, mode, current_graph: nodes.length > 0 ? { nodes, edges } : null 
       });
@@ -283,19 +267,12 @@ function Flowchart() {
         const existingNode = oldNodesMap.get(node.id);
         const isGroup = node.type === 'group';
         const isNew = !oldNodeIds.has(node.id);
-        
-        // LOGIC: 
-        // 1. If it's an existing node, KEEP its type, icon, and subtitle.
-        // 2. If it's a NEW node, default to basic 'smart' node with no icon.
         return {
             ...node,
             type: existingNode ? existingNode.type : (isGroup ? 'group' : 'smart'),
             data: { 
               ...node.data,
-              // Keep old body if AI sent empty
               body: node.data.body || (existingNode?.data?.body || ""), 
-              
-              // PRESERVE VISUALS: If we already set an icon/color, don't let AI overwrite it
               icon: existingNode?.data?.icon || "", 
               subtitle: existingNode?.data?.subtitle || "",
               backgroundColor: isNew ? '#d0f0c0' : (existingNode?.data?.backgroundColor || '#ffffff')
@@ -305,21 +282,15 @@ function Flowchart() {
       });
       const processedEdges = res.data.edges.map((edge: any) => ({
         ...edge,
-        // --- FIX 1: Apply the current global Edge Style (Curved/Right-Angle) ---
         type: edgeStyle, 
         markerEnd: { type: MarkerType.ArrowClosed },
-        style: { 
-            strokeWidth: 2,
-            stroke: '#333' // <--- 1. FIX: Force the line to be dark black/grey
-        },
-        labelBgStyle: { fill: '#ffffff' }, // <--- 2. FIX: Force white background for text
-        labelStyle: { fill: '#000000' },    // <--- 3. FIX: Force text to be black
+        style: { strokeWidth: 2, stroke: '#333' },
+        labelBgStyle: { fill: '#ffffff' },
+        labelStyle: { fill: '#000000' },
       }));
 
-      // 3. LAYOUT
       const { nodes: layoutedNodes, edges: lEdges } = getLayoutedElements(processedNodes, processedEdges);
 
-      // 4. SMART MERGE
       const finalNodes = layoutedNodes.map((node) => {
           const oldNode = oldNodesMap.get(node.id);
           if (oldNode) {
@@ -328,8 +299,6 @@ function Flowchart() {
                   position: oldNode.position, 
                   data: {
                       ...node.data,
-                      // --- FIX 2: Preserve User's Body Text ---
-                      // If the AI returned an empty body (common), keep the user's old body.
                       body: node.data.body || oldNode.data.body, 
                       backgroundColor: oldNode.data.backgroundColor 
                   }
@@ -342,14 +311,12 @@ function Flowchart() {
       setEdges(lEdges);
       addToHistory(finalNodes, lEdges);
       setIsDirty(true);
-      
-      if (nodes.length === 0) {
-          setTimeout(() => fitView(), 100);
-      }
+      if (nodes.length === 0) setTimeout(() => fitView(), 100);
       
     } catch (error) { console.error(error); alert("Error generating flow"); }
     setLoading(false);
   };
+
   const loadDemo = () => {
     if (nodes.length > 0 && isDirty && !window.confirm("Discard changes?")) return;
     const { nodes: dNodes, edges: dEdges } = getDemoData();
@@ -361,21 +328,22 @@ function Flowchart() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* --- NEW: Force Styles for Export --- */}
-    <style>
-      {`
-        /* Force edge label backgrounds to be white (Fixes black box) */
-        .react-flow__edge-textbg {
-          fill: #ffffff !important;
-        }
-        /* Ensure text is dark and readable */
-        .react-flow__edge-text {
-          fill: #222222 !important;
-          font-size: 12px;
-        }
-      `}
-    </style>
-	  <ControlBar 
+      <style>
+        {`
+        .react-flow__edge-textbg { fill: #ffffff !important; }
+        .react-flow__edge-text { fill: #222222 !important; font-size: 12px; }
+        /* Dark Mode Overrides */
+        ${isDarkMode ? `
+           .react-flow__edge-path { stroke: #888 !important; }
+           .react-flow__edge-text { fill: #eee !important; }
+           .react-flow__edge-textbg { fill: #1e1e1e !important; }
+           .react-flow__controls button { background-color: #333; fill: #fff; border-bottom: 1px solid #444; }
+           .react-flow__controls button:hover { background-color: #444; }
+        ` : ''}
+        `}
+      </style>
+      
+      <ControlBar 
         prompt={prompt} setPrompt={setPrompt}
         onGenerate={handleGenerate} loading={loading}
         mode={mode} setMode={setMode}
@@ -388,10 +356,12 @@ function Flowchart() {
         onSave={onSave} onLoadFile={handleFileUpload}
         onExport={onDownloadImage} onLoadDemo={loadDemo}
         isDirty={isDirty}
-		onAddNode={handleAddNode}
+        onAddNode={handleAddNode}
+        isDarkMode={isDarkMode}
+        toggleDarkMode={() => setIsDarkMode(!isDarkMode)}
       />
 
-      <div style={{ flex: 1, width: '100%', position: 'relative', background: '#fafafa' }}>
+      <div style={{ flex: 1, width: '100%', position: 'relative', background: isDarkMode ? '#121212' : '#fafafa', transition: 'background 0.3s' }}>
         <ReactFlow 
             nodes={nodes} edges={edges} nodeTypes={nodeTypes} 
             onNodesChange={onNodesChangeWrapped} onEdgesChange={onEdgesChangeWrapped}
@@ -400,8 +370,9 @@ function Flowchart() {
             onConnect={onConnectWrapped}
             onReconnect={onReconnect}
             fitView minZoom={0.1}
+            colorMode={isDarkMode ? 'dark' : 'light'}
         >
-          <Background color="#ccc" gap={20} />
+          <Background color={isDarkMode ? '#444' : '#ccc'} gap={20} />
           <Controls />
         </ReactFlow>
 
@@ -411,8 +382,9 @@ function Flowchart() {
             setEdges={(val: any) => { setEdges(val); setIsDirty(true); }} 
             selectedNodeId={selectedNodeId} 
             isOpen={editorOpen} toggleOpen={() => setEditorOpen(!editorOpen)} 
-			onAddNode={handleAddNode} // <-- Pass it here
-		/>
+            onAddNode={handleAddNode}
+            isDarkMode={isDarkMode} 
+        />
       </div>
     </div>
   );

@@ -1,4 +1,9 @@
-import React, { useRef, useEffect } from 'react';
+import React from 'react';
+import { 
+  Play, RotateCcw, RotateCw, Save, Upload, 
+  Image as ImageIcon, FilePlus, Moon, Sun, 
+  CornerDownLeft, PlusSquare, LayoutTemplate
+} from 'lucide-react';
 
 interface ControlBarProps {
   prompt: string;
@@ -13,100 +18,197 @@ interface ControlBarProps {
   canRedo: boolean;
   hasPendingChanges: boolean;
   onAcceptChanges: () => void;
-  edgeStyle: 'default' | 'smoothstep';
+  edgeStyle: string;
   onToggleEdgeStyle: () => void;
   onNewCanvas: () => void;
   onSave: () => void;
   onLoadFile: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onExport: () => void;
   onLoadDemo: () => void;
-  onAddNode: () => void;
   isDirty: boolean;
+  onAddNode: () => void;
+  isDarkMode: boolean;            
+  toggleDarkMode: () => void;     
 }
 
-export function ControlBar(props: ControlBarProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+export const ControlBar: React.FC<ControlBarProps> = ({
+  prompt, setPrompt, onGenerate, loading,
+  mode, setMode, onUndo, onRedo, canUndo, canRedo,
+  hasPendingChanges, onAcceptChanges,
+  onNewCanvas, onSave, onLoadFile, onExport, 
+  onAddNode, isDarkMode, toggleDarkMode,
+  edgeStyle, onToggleEdgeStyle
+}) => {
 
-  // Auto-resize textarea
-  useEffect(() => {
-    if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-        textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-    }
-  }, [props.prompt]);
+  const barStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '12px 20px',
+    borderBottom: isDarkMode ? '1px solid #333' : '1px solid #e0e0e0',
+    backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff',
+    color: isDarkMode ? '#e0e0e0' : '#333',
+    transition: 'all 0.3s ease',
+    flexWrap: 'wrap',
+  };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Submit on Enter (without Shift)
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      props.onGenerate();
-    }
+  const groupStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    paddingRight: '12px',
+    borderRight: isDarkMode ? '1px solid #333' : '1px solid #e0e0e0',
+  };
+
+  const btnBase: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    height: '36px',
+    padding: '0 12px',
+    borderRadius: '6px',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: 500,
+    transition: 'background 0.2s',
+    backgroundColor: isDarkMode ? '#2c2c2c' : '#f0f0f0',
+    color: isDarkMode ? '#fff' : '#333',
+  };
+
+  const primaryBtn: React.CSSProperties = {
+    ...btnBase,
+    backgroundColor: '#2563eb', 
+    color: '#fff',
+  };
+
+  const successBtn: React.CSSProperties = {
+    ...btnBase,
+    backgroundColor: '#10b981', 
+    color: '#fff',
+  };
+
+  const iconBtn: React.CSSProperties = {
+    ...btnBase,
+    padding: '0',
+    width: '36px', 
   };
 
   return (
-    <div style={{ padding: '10px 20px', background: '#f0f2f5', borderBottom: '1px solid #ccc', display: 'flex', gap: '10px', alignItems: 'center' }}>
-      <h3 style={{ margin: 0, marginRight: '10px', color: '#333' }}>✨ AI Flow</h3>
-      
-      <div style={{ display: 'flex', gap: '5px', marginRight: '10px' }}>
-           <button onClick={props.onUndo} disabled={!props.canUndo} style={{ cursor: props.canUndo ? 'pointer' : 'not-allowed', opacity: props.canUndo ? 1 : 0.5, fontSize: '18px', border: 'none', background: 'transparent' }} title="Undo">↩️</button>
-           <button onClick={props.onRedo} disabled={!props.canRedo} style={{ cursor: props.canRedo ? 'pointer' : 'not-allowed', opacity: props.canRedo ? 1 : 0.5, fontSize: '18px', border: 'none', background: 'transparent' }} title="Redo">↪️</button>
+    <div style={barStyle}>
+      {/* 1. BRAND */}
+      <div style={{ fontWeight: 'bold', fontSize: '18px', marginRight: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{ fontSize: '20px' }}>✨</span>
+        <span style={{ display: 'none', md: 'block' }}>AI Flow</span>
       </div>
 
-      <select value={props.mode} onChange={(e) => props.setMode(e.target.value)} style={{ padding: '10px', borderRadius: '4px', border: '1px solid #ccc', height: '40px' }}>
-        <option value="flowchart">Flowchart</option>
-        <option value="system">Architecture</option>
-      </select>
-
-      {/* --- CHANGED: Textarea instead of Input --- */}
-      <div style={{ flex: 1, position: 'relative', display: 'flex' }}>
-        <textarea
-            ref={textareaRef}
-            rows={1}
-            style={{ 
-                flex: 1, padding: '10px', fontSize: '14px', borderRadius: '4px', 
-                border: '1px solid #ccc', resize: 'none', overflow: 'hidden',
-                fontFamily: 'inherit', minHeight: '40px', maxHeight: '150px'
+      {/* 2. PROMPT INPUT */}
+      <div style={{ ...groupStyle, flex: 1, borderRight: 'none' }}>
+        <div style={{ position: 'relative', flex: 1, display: 'flex' }}>
+          <input
+            type="text"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && onGenerate()}
+            placeholder="Describe your flowchart..."
+            style={{
+              flex: 1,
+              height: '36px',
+              padding: '0 12px',
+              borderRadius: '6px 0 0 6px',
+              border: isDarkMode ? '1px solid #444' : '1px solid #ddd',
+              backgroundColor: isDarkMode ? '#2c2c2c' : '#fff',
+              color: isDarkMode ? '#fff' : '#000',
+              outline: 'none',
             }}
-            placeholder="Describe flow... (Shift+Enter for new line)"
-            value={props.prompt}
-            onChange={(e) => props.setPrompt(e.target.value)}
-            onKeyDown={handleKeyDown} 
-            disabled={props.loading}
-        />
-      </div>
-      
-      <button
-        onClick={props.onGenerate}
-        disabled={props.loading}
-        style={{ padding: '10px 20px', height: '40px', cursor: 'pointer', backgroundColor: props.loading ? '#ccc' : '#007bff', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
-      >
-        {props.loading ? "..." : "Update"}
-      </button>
-
-      {props.hasPendingChanges && (
-          <button 
-              onClick={props.onAcceptChanges}
-              style={{ padding: '10px 15px', height: '40px', backgroundColor: '#198754', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
-              title="Accept Changes"
+          />
+          <select
+            value={mode}
+            onChange={(e) => setMode(e.target.value)}
+            style={{
+              height: '38px', 
+              padding: '0 10px',
+              border: isDarkMode ? '1px solid #444' : '1px solid #ddd',
+              borderLeft: 'none',
+              borderRadius: '0 6px 6px 0',
+              backgroundColor: isDarkMode ? '#333' : '#f9f9f9',
+              color: isDarkMode ? '#fff' : '#333',
+              fontSize: '12px',
+              cursor: 'pointer',
+            }}
           >
-              <span>✓</span>
+            <option value="flowchart">Flowchart</option>
+            <option value="system">Architecture</option>
+          </select>
+        </div>
+        
+        <button 
+          onClick={onGenerate} 
+          disabled={loading || !prompt}
+          style={{ ...primaryBtn, opacity: loading || !prompt ? 0.6 : 1 }}
+        >
+          {loading ? <RotateCw className="spin" size={16} /> : <Play size={16} fill="currentColor" />}
+          Generate
+        </button>
+      </div>
+
+      {/* 3. EDIT ACTIONS */}
+      <div style={groupStyle}>
+        {hasPendingChanges && (
+          <button onClick={onAcceptChanges} style={successBtn} title="Accept AI Changes">
+             <LayoutTemplate size={16} /> Apply
           </button>
-      )}
+        )}
+        <button onClick={onAddNode} style={btnBase} title="Add Manual Node">
+            <PlusSquare size={16} /> Node
+        </button>
+      </div>
 
-      <div style={{ width: '1px', height: '30px', background: '#ddd', margin: '0 5px' }}></div>
-      
-      <button onClick={props.onAddNode} title="Add Node" style={{ padding: '8px 12px', height: '40px', backgroundColor: 'white', color: '#333', border: '1px solid #ccc', borderRadius: '6px', cursor: 'pointer' }}>+ Node</button>
+      {/* 4. HISTORY */}
+      <div style={groupStyle}>
+        <button onClick={onUndo} disabled={!canUndo} style={{ ...iconBtn, opacity: !canUndo ? 0.3 : 1 }} title="Undo">
+          <RotateCcw size={16} />
+        </button>
+        <button onClick={onRedo} disabled={!canRedo} style={{ ...iconBtn, opacity: !canRedo ? 0.3 : 1 }} title="Redo">
+          <RotateCw size={16} />
+        </button>
+      </div>
 
-      <button onClick={props.onToggleEdgeStyle} title="Toggle Edge Style" style={{ padding: '8px 12px', height: '40px', backgroundColor: 'white', color: '#333', border: '1px solid #ccc', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-        {props.edgeStyle === 'default' ? '⤵' : '⮥'}
-      </button>
+      {/* 5. FILE OPS */}
+      <div style={{ ...groupStyle, borderRight: 'none' }}>
+        <button onClick={onNewCanvas} style={iconBtn} title="New Canvas">
+          <FilePlus size={16} />
+        </button>
+        
+        <label style={iconBtn} title="Open File">
+          <Upload size={16} />
+          <input type="file" onChange={onLoadFile} accept=".json" style={{ display: 'none' }} />
+        </label>
 
-      <button onClick={props.onNewCanvas} title="New" style={{ padding: '10px 15px', height: '40px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>📄</button>
-      <button onClick={props.onSave} title="Save" style={{ padding: '10px 15px', height: '40px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>{props.isDirty ? '💾 *' : '💾'}</button>
-      <button onClick={() => fileInputRef.current?.click()} title="Load" style={{ padding: '10px 15px', height: '40px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>📂</button>
-      <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".json" onChange={props.onLoadFile} />
-      <button onClick={props.onExport} title="PNG" style={{ padding: '10px 15px', height: '40px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>📷</button>
+        <button onClick={onSave} style={iconBtn} title="Save JSON">
+          <Save size={16} />
+        </button>
+
+        <button onClick={onExport} style={iconBtn} title="Export PNG">
+          <ImageIcon size={16} />
+        </button>
+
+        {/* EDGE STYLE TOGGLE */}
+        <button onClick={onToggleEdgeStyle} style={iconBtn} title={`Edge Style: ${edgeStyle === 'default' ? 'Bezier' : 'Step'}`}>
+          <CornerDownLeft size={16} />
+        </button>
+
+        {/* DARK MODE TOGGLE */}
+        <button onClick={toggleDarkMode} style={{ ...iconBtn, marginLeft: '8px' }} title="Toggle Theme">
+           {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
+      </div>
+
+      <style>{`
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
-}
+};
