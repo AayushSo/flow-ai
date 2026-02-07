@@ -13,12 +13,8 @@ type CustomNodeData = Node['data'] & {
 
 type CustomNodeProps = NodeProps<Node<CustomNodeData>>;
 
-// --- THE FIX: Stacked Handles (4 Visual Dots, Bidirectional) ---
-// We place a visible "Source" handle. 
-// Directly underneath, we place an invisible "Target" handle.
-// This creates the illusion of 1 dot that can do both input/output.
+// --- Stacked Handles (4 Visual Dots, Bidirectional) ---
 const StackedHandle = ({ position, id, style = {} }: { position: Position, id: string, style?: React.CSSProperties }) => {
-    // Common positioning logic
     const handleSize = 10;
     const baseStyle: React.CSSProperties = {
         width: handleSize,
@@ -30,16 +26,14 @@ const StackedHandle = ({ position, id, style = {} }: { position: Position, id: s
 
     return (
         <>
-            {/* INVISIBLE TARGET (Accepts connections) */}
-            {/* Opacity 0 makes it invisible, but it still captures mouse snaps */}
+            {/* INVISIBLE TARGET */}
             <Handle 
                 type="target" 
                 position={position} 
                 id={`target-${id}`} 
                 style={{ ...baseStyle, opacity: 0, zIndex: 5 }} 
             />
-            
-            {/* VISIBLE SOURCE (Starts connections) */}
+            {/* VISIBLE SOURCE */}
             <Handle 
                 type="source" 
                 position={position} 
@@ -50,7 +44,6 @@ const StackedHandle = ({ position, id, style = {} }: { position: Position, id: s
     );
 };
 
-// --- Helper: 4-Way Connection Points ---
 const FourWayHandles = () => (
     <>
         <StackedHandle position={Position.Top} id="top" />
@@ -61,7 +54,7 @@ const FourWayHandles = () => (
 );
 
 
-// --- 1. Enhanced Smart Node (Square) ---
+// --- 1. Enhanced Smart Node (Auto-Resizing) ---
 export const SmartNode = memo(({ data, selected }: CustomNodeProps) => {
   const label = (data.label as string) || 'Node';
   const subtitle = (data.subtitle as string) || '';
@@ -75,10 +68,11 @@ export const SmartNode = memo(({ data, selected }: CustomNodeProps) => {
       
       <div
         style={{
+          // LAYOUT FIXES:
           width: '100%',
-          height: '100%',
+          height: 'auto',        // Allow growth
+          minHeight: '100%',     // Respect Resizer height
           minWidth: '150px',
-          minHeight: '60px',
           padding: '10px 15px',
           borderRadius: '8px',
           background: bgColor,
@@ -88,8 +82,7 @@ export const SmartNode = memo(({ data, selected }: CustomNodeProps) => {
           flexDirection: 'column',
           justifyContent: 'center',
           boxSizing: 'border-box',
-          overflow: 'hidden',
-          position: 'relative' // Needed for absolute handles
+          position: 'relative'
         }}
       >
         <FourWayHandles />
@@ -97,12 +90,18 @@ export const SmartNode = memo(({ data, selected }: CustomNodeProps) => {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {icon && (
-              <div style={{ color: '#555' }}>
+              <div style={{ color: '#555', flexShrink: 0 }}>
                   {getIcon(icon)}
               </div>
           )}
-          <div style={{ flex: 1, overflow: 'hidden' }}>
-              <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#222', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+          <div style={{ flex: 1 }}>
+              <div style={{ 
+                  fontWeight: 'bold', 
+                  fontSize: '14px', 
+                  color: '#222', 
+                  whiteSpace: 'pre-wrap', // Allow wrapping
+                  wordBreak: 'break-word' // Prevent overflow
+              }}>
                 {label}
               </div>
               {subtitle && (
@@ -121,10 +120,9 @@ export const SmartNode = memo(({ data, selected }: CustomNodeProps) => {
               borderTop: '1px solid rgba(0,0,0,0.1)', 
               fontSize: '11px', 
               color: '#555',
-              whiteSpace: 'pre-wrap', 
+              whiteSpace: 'pre-wrap', // Allow wrapping
               lineHeight: '1.4',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
+              wordBreak: 'break-word'
           }}>
               {body}
           </div>
@@ -140,12 +138,18 @@ export const DecisionNode = memo(({ data, selected }: CustomNodeProps) => {
   const icon = (data.icon as string) || '';
   const bgColor = (data.backgroundColor as string) || '#fff6e5';
 
-
   return (
     <>
       <NodeResizer minWidth={100} minHeight={100} keepAspectRatio isVisible={selected} />
 
-      <div style={{ position: 'relative', width: '100%', height: '100%', minWidth: '100px', minHeight: '100px' }}>
+      <div style={{ 
+          position: 'relative', 
+          width: '100%', 
+          height: '100%', 
+          minWidth: '100px', 
+          minHeight: '100px',
+          aspectRatio: '1 / 1' 
+      }}>
         
         {/* Diamond Shape */}
         <div
@@ -153,7 +157,7 @@ export const DecisionNode = memo(({ data, selected }: CustomNodeProps) => {
             position: 'absolute',
             top: '50%',
             left: '50%',
-            width: '70.7%', // 1/sqrt(2) to touch edges
+            width: '70.7%', 
             height: '70.7%',
             background: bgColor,
             border: selected ? '2px solid #f5a623' : '1px solid #f5a623',
@@ -163,14 +167,14 @@ export const DecisionNode = memo(({ data, selected }: CustomNodeProps) => {
           }}
         />
 
-        {/* Content */}
+        {/* Content - Now allows wrapping */}
         <div style={{ 
             position: 'absolute', 
             top: '50%', left: '50%', 
             transform: 'translate(-50%, -50%)', 
             zIndex: 1, 
             textAlign: 'center', 
-            width: '60%',
+            width: '60%', // Constrain text to inside the diamond
             pointerEvents: 'none'
         }}>
            {icon && (
@@ -178,32 +182,27 @@ export const DecisionNode = memo(({ data, selected }: CustomNodeProps) => {
                   {getIcon(icon)} 
                </div>
            )}
-           <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#555', wordWrap: 'break-word' }}>
+           <div style={{ 
+               fontSize: '12px', 
+               fontWeight: 'bold', 
+               color: '#555', 
+               wordWrap: 'break-word',
+               whiteSpace: 'pre-wrap' // Allow wrapping
+           }}>
               {label}
            </div>
         </div>
 
-        {/* DIAMOND HANDLES (Stacked)
-            We use explicit style overrides to force them to the edge center points.
-        */}
-        {/* TOP */}
         <StackedHandle position={Position.Top} id="top" style={{ top: 0, left: '50%', transform: 'translateX(-50%)' }} />
-        
-        {/* RIGHT */}
         <StackedHandle position={Position.Right} id="right" style={{ top: '50%', right: 0, transform: 'translateY(-50%)' }} />
-        
-        {/* BOTTOM */}
         <StackedHandle position={Position.Bottom} id="bottom" style={{ bottom: 0, left: '50%', transform: 'translateX(-50%)' }} />
-        
-        {/* LEFT */}
         <StackedHandle position={Position.Left} id="left" style={{ top: '50%', left: 0, transform: 'translateY(-50%)' }} />
-
       </div>
     </>
   );
 });
 
-// --- 3. Layered Node ---
+// --- 3. Layered Node (Auto-Resizing) ---
 export const LayeredNode = memo(({ data, selected }: CustomNodeProps) => {
     const label = (data.label as string) || 'Collection';
     const body = (data.body as string) || '';
@@ -214,7 +213,7 @@ export const LayeredNode = memo(({ data, selected }: CustomNodeProps) => {
       <>
         <NodeResizer minWidth={150} minHeight={60} isVisible={selected} />
 
-        <div style={{ position: 'relative', width: '100%', height: '100%', minWidth: '150px', minHeight: '60px' }}>
+        <div style={{ position: 'relative', width: '100%', height: 'auto', minHeight: '100%', minWidth: '150px' }}>
           {/* Decorative Layers */}
           <div style={{
               position: 'absolute', top: -4, left: 4, right: -4, bottom: 4,
@@ -231,7 +230,8 @@ export const LayeredNode = memo(({ data, selected }: CustomNodeProps) => {
               position: 'relative', zIndex: 1, padding: '10px 15px', borderRadius: '6px',
               background: bgColor, 
               border: selected ? '2px solid #555' : '1px solid #ddd',
-              width: '100%', height: '100%',
+              width: '100%', 
+              height: 'auto', minHeight: '100%', // Allow growth
               display: 'flex', flexDirection: 'column', justifyContent: 'center',
               boxSizing: 'border-box'
             }}
@@ -244,8 +244,8 @@ export const LayeredNode = memo(({ data, selected }: CustomNodeProps) => {
               ) : (
                   <div style={{ color: '#555' }}>{getIcon('database')}</div>
               )}
-              <div style={{ overflow: 'hidden' }}>
-                  <div style={{ fontWeight: 'bold', fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
+              <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '14px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{label}</div>
                   <div style={{ fontSize: '10px', color: '#777' }}>Collection</div>
               </div>
             </div>
@@ -253,8 +253,7 @@ export const LayeredNode = memo(({ data, selected }: CustomNodeProps) => {
             {body && (
               <div style={{ 
                   marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(0,0,0,0.1)', 
-                  fontSize: '11px', color: '#555', whiteSpace: 'pre-wrap',
-                  overflow: 'hidden'
+                  fontSize: '11px', color: '#555', whiteSpace: 'pre-wrap', wordBreak: 'break-word'
               }}>
                   {body}
               </div>
@@ -298,4 +297,4 @@ export const GroupNode = memo(({ data, selected }: CustomNodeProps) => {
       </div>
     </>
   );
-});	
+});
