@@ -1,126 +1,157 @@
-import { Handle, Position, NodeResizer } from '@xyflow/react';
-import type { NodeProps } from '@xyflow/react';
+import { memo } from 'react';
+import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { getIcon } from './IconMapper';
 
-// --- 1. The Smart Node ---
-export function SmartNode(props: NodeProps) {
-  // 🔨 THE HAMMER: Cast data to 'any' for safety
-  const safeData = props.data as any;
-
-  const label = String(safeData.label || 'Node');
-  const body = String(safeData.body || '');
-  const hasBody = body.trim().length > 0;
-  const bgColor = String(safeData.backgroundColor || '#ffffff');
-  
+// --- 1. Enhanced Smart Node (Rounded Rectangle) ---
+export const SmartNode = memo(({ data, selected }: NodeProps) => {
   return (
-    <div 
-      style={{ 
-        backgroundColor: bgColor, 
-        border: props.selected ? '2px solid #007bff' : '1px solid #333', 
-        borderRadius: '5px',
-        width: '100%',         
-        height: 'auto',        
-        minHeight: '100%',     
-        boxShadow: props.selected ? '0 4px 12px rgba(0,123,255,0.3)' : '0 2px 5px rgba(0,0,0,0.1)',
-        fontSize: '12px',
-        color: '#222',
-        textAlign: 'center',
-        overflow: 'visible', // Changed to visible so handles on edge don't get clipped
+    <div
+      style={{
+        padding: '10px 15px',
+        borderRadius: '8px',
+        background: '#fff',
+        border: selected ? '2px solid #555' : '1px solid #ddd',
+        boxShadow: selected ? '0 4px 12px rgba(0,0,0,0.1)' : '0 2px 5px rgba(0,0,0,0.05)',
+        minWidth: '150px',
         display: 'flex',
-        flexDirection: 'column',
-        position: 'relative'
+        alignItems: 'center',
+        gap: '10px',
+        textAlign: 'left',
+        transition: 'all 0.2s ease',
       }}
     >
-      <NodeResizer 
-        color="#007bff" 
-        isVisible={props.selected} 
-        minWidth={100} 
-        minHeight={40} 
-      />
-
-      {/* --- INPUTS (Targets) --- */}
-      {/* Top Input */}
-      <Handle type="target" position={Position.Top} id="t" style={{ background: '#555', zIndex: 10 }} />
-      {/* Left Input */}
-      <Handle type="target" position={Position.Left} id="l" style={{ background: '#555', zIndex: 10 }} />
+      <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
       
-      {/* Header */}
-      <div style={{ 
-        padding: '8px 10px', 
-        fontWeight: 'bold',
-        backgroundColor: 'rgba(0,0,0,0.05)', 
-        borderBottom: hasBody ? '1px solid rgba(0,0,0,0.1)' : 'none'
-      }}>
-        {label}
+      {/* Icon Section */}
+      <div style={{ color: '#555' }}>
+        {getIcon(data.icon as string)}
       </div>
 
-      {/* Body */}
-      {hasBody && (
-        <div style={{ 
-          padding: '8px 10px', 
-          textAlign: 'left', 
-          fontSize: '11px',
-          color: '#555',
-          whiteSpace: 'pre-wrap', 
-          flex: 1, 
-          overflowY: 'auto' 
-        }}>
-          {body}
+      {/* Typography Section */}
+      <div>
+        <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#222' }}>
+          {data.label as string}
         </div>
-      )}
+        {data.subtitle && (
+          <div style={{ fontSize: '10px', color: '#777', marginTop: '2px' }}>
+            {data.subtitle as string}
+          </div>
+        )}
+      </div>
 
-      {/* --- OUTPUTS (Sources) --- */}
-      {/* Bottom Output */}
-      <Handle type="source" position={Position.Bottom} id="b" style={{ background: '#555', zIndex: 10 }} />
-      {/* Right Output */}
-      <Handle type="source" position={Position.Right} id="r" style={{ background: '#555', zIndex: 10 }} />
+      <Handle type="source" position={Position.Bottom} style={{ background: '#555' }} />
     </div>
   );
-}
+});
 
-// --- 2. The Group Node ---
-export function GroupNode(props: NodeProps) {
-  const safeData = props.data as any;
-  const label = String(safeData.label || 'Group');
-  const bgColor = String(safeData.backgroundColor || 'rgba(240, 240, 240, 0.4)');
-
+// --- 2. New Decision Node (Diamond) ---
+export const DecisionNode = memo(({ data, selected }: NodeProps) => {
   return (
-    <div style={{ 
-      width: '100%', 
-      height: '100%', 
-      backgroundColor: bgColor, 
-      border: props.selected ? '2px dashed #007bff' : '2px dashed #aaa', 
-      borderRadius: '8px',
-      position: 'relative'
-    }}>
-      <NodeResizer 
-        color="#007bff" 
-        isVisible={props.selected} 
-        minWidth={200} 
-        minHeight={100} 
+    <div style={{ position: 'relative', width: '140px', height: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {/* The Diamond Shape (Rotated Square) */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 15,
+          left: 15,
+          width: '110px',
+          height: '110px',
+          background: '#fff6e5', // Light yellow for decisions
+          border: selected ? '2px solid #f5a623' : '1px solid #f5a623',
+          transform: 'rotate(45deg)',
+          boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
+          zIndex: 0,
+        }}
       />
 
-      {/* Group nodes usually just need top/bottom to encompass things, but we can add all 4 */}
-      <Handle type="target" position={Position.Top} style={{ background: 'transparent', border: 'none', top: -5 }} />
-      <Handle type="source" position={Position.Bottom} style={{ background: 'transparent', border: 'none', bottom: -5 }} />
-      <Handle type="target" position={Position.Left} style={{ background: 'transparent', border: 'none', left: -5 }} />
-      <Handle type="source" position={Position.Right} style={{ background: 'transparent', border: 'none', right: -5 }} />
-      
-      <div style={{ 
-        position: 'absolute', 
-        top: '-14px', 
-        left: '10px', 
-        backgroundColor: '#fff', 
-        padding: '2px 8px', 
-        fontWeight: 'bold', 
-        fontSize: '11px', 
-        color: '#666',
-        border: '1px solid #ccc',
-        borderRadius: '4px',
-        zIndex: 5,
-        whiteSpace: 'nowrap'
-      }}>
-        {label}
+      {/* The Content (Not Rotated) */}
+      <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', maxWidth: '90px' }}>
+         {/* Optional: Small Icon above text */}
+         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '4px', color: '#d48806' }}>
+            {getIcon('question')} 
+         </div>
+         <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>
+            {data.label as string}
+         </div>
+      </div>
+
+      {/* Handles tailored for Diamond */}
+      <Handle type="target" position={Position.Top} style={{ top: 15, background: '#555' }} />
+      <Handle type="source" position={Position.Right} id="yes" style={{ right: 15, background: '#555' }} />
+      <Handle type="source" position={Position.Bottom} id="no" style={{ bottom: 15, background: '#555' }} />
+      <Handle type="source" position={Position.Left} style={{ left: 15, background: '#555' }} />
+    </div>
+  );
+});
+
+// --- 3. Stacked/Layered Node (e.g., for Databases/Multiple Items) ---
+export const LayeredNode = memo(({ data, selected }: NodeProps) => {
+    return (
+      <div style={{ position: 'relative' }}>
+        {/* Background Layers */}
+        <div style={{
+            position: 'absolute', top: -4, left: 4, right: -4, bottom: 4,
+            background: '#f0f0f0', border: '1px solid #ccc', borderRadius: '6px', zIndex: 0
+        }} />
+        <div style={{
+            position: 'absolute', top: -8, left: 8, right: -8, bottom: 8,
+            background: '#e0e0e0', border: '1px solid #ccc', borderRadius: '6px', zIndex: -1
+        }} />
+        
+        {/* Main Content Card */}
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            padding: '10px 15px',
+            borderRadius: '6px',
+            background: '#fff',
+            border: selected ? '2px solid #555' : '1px solid #ddd',
+            display: 'flex', alignItems: 'center', gap: '10px',
+            minWidth: '150px'
+          }}
+        >
+          <Handle type="target" position={Position.Top} />
+          <div style={{ color: '#555' }}>{getIcon('database')}</div>
+          <div>
+            <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{data.label as string}</div>
+            <div style={{ fontSize: '10px', color: '#777' }}>Collection</div>
+          </div>
+          <Handle type="source" position={Position.Bottom} />
+        </div>
+      </div>
+    );
+  });
+  // --- 4. Group Node (Restored) ---
+export const GroupNode = memo(({ data, selected }: NodeProps) => {
+  return (
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        backgroundColor: 'rgba(240, 240, 240, 0.4)',
+        border: selected ? '2px dashed #555' : '2px dashed #ccc',
+        borderRadius: '12px',
+        position: 'relative',
+      }}
+    >
+      {/* Group Label / Header */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '-14px',
+          left: '20px',
+          background: '#ffffff',
+          padding: '4px 12px',
+          borderRadius: '12px',
+          border: '1px solid #ccc',
+          fontWeight: 'bold',
+          fontSize: '12px',
+          color: '#555',
+        }}
+      >
+        {data.label as string}
       </div>
     </div>
   );
-}
+});

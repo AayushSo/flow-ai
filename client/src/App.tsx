@@ -24,7 +24,7 @@ import { getLayoutedElements } from "./utils/layout";
 import { EditorPanel } from "./components/EditorPanel";
 import { ControlBar } from "./components/ControlBar"; // NEW IMPORT
 import { getDemoData } from "./data/demoData";
-import { SmartNode, GroupNode } from "./components/CustomNodes";
+import { SmartNode, GroupNode, DecisionNode, LayeredNode } from "./components/CustomNodes";
 
 export default function App() {
   return (
@@ -54,7 +54,7 @@ function Flowchart() {
   
   const { fitView, getNodes, toObject } = useReactFlow();
   
-  const nodeTypes = useMemo(() => ({ smart: SmartNode, group: GroupNode }), []);
+  const nodeTypes = useMemo(() => ({ smart: SmartNode, group: GroupNode,decision: DecisionNode,layered: LayeredNode }), []);
 
   // --- HELPERS ---
   const addToHistory = (newNodes: any[], newEdges: any[]) => {
@@ -282,13 +282,45 @@ function Flowchart() {
       const processedNodes = res.data.nodes.map((node: any) => {
         const isGroup = node.type === 'group';
         const isNew = !oldNodeIds.has(node.id);
-        
+        const label = node.data.label || "";
+        const lowerLabel = label.toLowerCase();
+
+        // --- 1. HEURISTIC: Auto-detect Node Type ---
+        // If the label ends with "?", force it to be a Decision Diamond.
+        // If it mentions "database", force it to be a Layered Node.
+        let nodeType = node.type || 'smart'; 
+        if (!isGroup) {
+             if (label.trim().endsWith('?')) {
+                 nodeType = 'decision';
+             } else if (lowerLabel.includes('database') || lowerLabel.includes('store')) {
+                 nodeType = 'layered';
+             } else {
+                 nodeType = 'smart';
+             }
+        }
+
+        // --- 2. HEURISTIC: Auto-assign Icons ---
+        // Since the AI isn't sending 'icon' fields yet, we guess based on keywords.
+        let icon = 'code'; 
+        if (nodeType === 'decision') icon = 'question';
+        else if (nodeType === 'layered') icon = 'database';
+        else if (lowerLabel.includes('user') || lowerLabel.includes('client')) icon = 'user';
+        else if (lowerLabel.includes('server') || lowerLabel.includes('api')) icon = 'server';
+        else if (lowerLabel.includes('ai') || lowerLabel.includes('agent') || lowerLabel.includes('gpt')) icon = 'brain';
+        else if (lowerLabel.includes('web') || lowerLabel.includes('ui')) icon = 'globe';
+        else if (lowerLabel.includes('file') || lowerLabel.includes('doc')) icon = 'file';
+        else if (lowerLabel.includes('config') || lowerLabel.includes('setting')) icon = 'settings';
+
         return {
             ...node,
-            type: isGroup ? 'group' : 'smart', 
+            type: isGroup ? 'group' : nodeType, 
             data: { 
-              label: node.data.label,
-              body: node.data.body || "", // Default to empty if AI sends nothing
+              label: label,
+              // Use a generic subtitle for now to test typography
+              subtitle: node.data.subtitle || "Process Step", 
+              body: node.data.body || "", 
+              // Use the heuristic icon unless the backend actually sent one
+              icon: node.data.icon || icon, 
               backgroundColor: isNew ? '#d0f0c0' : (node.data.backgroundColor || '#ffffff')
             }, 
             style: isGroup ? { width: 100, height: 100, zIndex: -1 } : {}
