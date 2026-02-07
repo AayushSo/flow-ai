@@ -1,5 +1,10 @@
 import { useRef, useState } from 'react';
 import { MarkerType } from '@xyflow/react';
+import { 
+  Database, Server, User, BrainCircuit, Globe, 
+  FileText, Settings, Cloud, Code, AlertCircle, 
+  CheckCircle, HelpCircle, Square, Layers, Diamond 
+} from 'lucide-react';
 
 export function EditorPanel({ nodes, setNodes, edges, setEdges, selectedNodeId, isOpen, toggleOpen }: any) {
     const colorInputRef = useRef<HTMLInputElement>(null);
@@ -20,14 +25,13 @@ export function EditorPanel({ nodes, setNodes, edges, setEdges, selectedNodeId, 
     // 2. Prepare Data
     const selectedNode = nodes.find((n: any) => n.id === selectedNodeId);
     
-    // --- RESTORED LOGIC ---
     // Filter nodes to find potential targets (excluding self)
     const otherNodes = nodes.filter((n: any) => n.id !== selectedNodeId);
     // Find lines going OUT from this node
     const outgoingEdges = edges.filter((e: any) => e.source === selectedNodeId);
 
-    // 3. Helper to update node data
-    const updateNode = (field: string, value: any) => {
+    // 3. Helper to update node DATA (Label, Icon, Subtitle, Body)
+    const updateNodeData = (field: string, value: any) => {
       setNodes((nds: any[]) => nds.map((n) => {
           if (n.id === selectedNodeId) {
              return { ...n, data: { ...n.data, [field]: value } };
@@ -36,7 +40,18 @@ export function EditorPanel({ nodes, setNodes, edges, setEdges, selectedNodeId, 
       }));
     };
 
-    // 4. Helper to delete the node
+    // 4. Helper to update node TYPE (Shape)
+    // We need a separate function because 'type' is at the root, not inside 'data'
+    const updateNodeType = (newType: string) => {
+        setNodes((nds: any[]) => nds.map((n) => {
+            if (n.id === selectedNodeId) {
+               return { ...n, type: newType };
+            }
+            return n;
+        }));
+    };
+
+    // 5. Helper to delete the node
     const handleDeleteNode = () => {
         if(!window.confirm("Delete this node?")) return;
         setNodes((nds: any[]) => nds.filter((n) => n.id !== selectedNodeId));
@@ -44,39 +59,46 @@ export function EditorPanel({ nodes, setNodes, edges, setEdges, selectedNodeId, 
         toggleOpen(); 
     };
 
-    // --- NEW: Connection Helpers ---
+    // Connection Helpers
     const handleAddEdge = () => {
         if (!connectTargetId) return;
         const newEdge = {
             id: `manual-e-${Date.now()}`,
             source: selectedNodeId,
             target: connectTargetId,
-            type: 'default', // You could pass 'smoothstep' prop here if you wanted
+            type: 'default', 
             markerEnd: { type: MarkerType.ArrowClosed },
             style: { stroke: '#333', strokeWidth: 2 }
         };
         setEdges((eds: any[]) => [...eds, newEdge]);
-        setConnectTargetId(""); // Reset dropdown
+        setConnectTargetId(""); 
     };
 
     const handleDeleteEdge = (edgeId: string) => {
         setEdges((eds: any[]) => eds.filter((e) => e.id !== edgeId));
     };
 
-    // --- COLOR PALETTE ---
-    const presetColors = [
-        '#ffffff', // White
-        '#ffcccb', // Red
-        '#c1e1c1', // Green
-        '#add8e6', // Blue
-        '#f0e68c', // Yellow
-        '#e6d2b5', // Coffee
-        '#e6e6fa', // Lavender
+    // --- ASSETS ---
+    const presetColors = ['#ffffff', '#ffcccb', '#c1e1c1', '#add8e6', '#f0e68c', '#e6d2b5', '#e6e6fa'];
+    const iconOptions = [
+        { value: '', label: 'None' },
+        { value: 'database', label: 'DB' },
+        { value: 'server', label: 'Server' },
+        { value: 'user', label: 'User' },
+        { value: 'brain', label: 'AI' },
+        { value: 'globe', label: 'Web' },
+        { value: 'cloud', label: 'Cloud' },
+        { value: 'file', label: 'File' },
+        { value: 'settings', label: 'Config' },
+        { value: 'code', label: 'Code' },
+        { value: 'question', label: '?' },
+        { value: 'error', label: '!' },
+        { value: 'success', label: '✓' },
     ];
   
     return (
       <div style={{ 
-        position: 'absolute', top: 0, right: 0, bottom: 0, width: '300px', 
+        position: 'absolute', top: 0, right: 0, bottom: 0, width: '320px', 
         backgroundColor: '#fff', borderLeft: '1px solid #ddd', padding: '20px', 
         boxShadow: '-2px 0 5px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', zIndex: 10 
       }}>
@@ -88,25 +110,77 @@ export function EditorPanel({ nodes, setNodes, edges, setEdges, selectedNodeId, 
         {selectedNode ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', flex: 1, overflowY: 'auto' }}>
              
-             {/* Label Input */}
+             {/* 1. Label Input */}
              <div>
                 <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#666' }}>Label</label>
                 <input 
                   type="text" 
                   value={selectedNode.data.label} 
-                  onChange={(e) => updateNode('label', e.target.value)}
+                  onChange={(e) => updateNodeData('label', e.target.value)}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                />
+             </div>
+             
+             {/* 2. Subtitle Input (NEW) */}
+             <div>
+                <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#666' }}>Subtitle</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Validates Input"
+                  value={selectedNode.data.subtitle || ''} 
+                  onChange={(e) => updateNodeData('subtitle', e.target.value)}
                   style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
                 />
              </div>
 
-             {/* Background Color */}
+             {/* 3. Shape / Type Selector (NEW) */}
+             <div>
+                <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#666' }}>Shape</label>
+                <div style={{ display: 'flex', gap: '5px' }}>
+                    {[
+                        { id: 'smart', label: 'Box', icon: <Square size={16}/> },
+                        { id: 'decision', label: 'Decision', icon: <Diamond size={16}/> },
+                        { id: 'layered', label: 'Stack', icon: <Layers size={16}/> },
+                    ].map(type => (
+                        <button
+                            key={type.id}
+                            onClick={() => updateNodeType(type.id)}
+                            style={{
+                                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+                                padding: '8px', borderRadius: '4px', cursor: 'pointer',
+                                border: selectedNode.type === type.id ? '2px solid #333' : '1px solid #ddd',
+                                backgroundColor: selectedNode.type === type.id ? '#eee' : '#fff',
+                                fontSize: '12px'
+                            }}
+                        >
+                            {type.icon} {type.label}
+                        </button>
+                    ))}
+                </div>
+             </div>
+
+             {/* 4. Icon Selector (NEW) */}
+             <div>
+                <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#666' }}>Icon</label>
+                <select 
+                    value={selectedNode.data.icon || ''}
+                    onChange={(e) => updateNodeData('icon', e.target.value)}
+                    style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                >
+                    {iconOptions.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                </select>
+             </div>
+
+             {/* 5. Background Color */}
              <div>
                 <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#666' }}>Color</label>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     {presetColors.map(c => (
                         <div 
                             key={c} 
-                            onClick={() => updateNode('backgroundColor', c)} 
+                            onClick={() => updateNodeData('backgroundColor', c)} 
                             style={{ 
                                 width: '32px', height: '32px', 
                                 backgroundColor: c, 
@@ -130,18 +204,17 @@ export function EditorPanel({ nodes, setNodes, edges, setEdges, selectedNodeId, 
                     <input 
                         ref={colorInputRef} type="color" 
                         value={selectedNode.data.backgroundColor || '#ffffff'} 
-                        onChange={(e) => updateNode('backgroundColor', e.target.value)}
+                        onChange={(e) => updateNodeData('backgroundColor', e.target.value)}
                         style={{ display: 'none' }}
                     />
                 </div>
              </div>
 
-             {/* --- RESTORED: Connections Section --- */}
+             {/* 6. Connections Section */}
              <div>
                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#666' }}>Connections (Outgoing)</label>
                  <div style={{ background: '#f9f9f9', padding: '10px', borderRadius: '6px', border: '1px solid #eee' }}>
                      
-                     {/* List Existing */}
                      <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 10px 0' }}>
                          {outgoingEdges.length === 0 && <li style={{ fontSize: '12px', color: '#999', fontStyle: 'italic' }}>No outgoing connections</li>}
                          {outgoingEdges.map((edge: any) => {
@@ -159,7 +232,6 @@ export function EditorPanel({ nodes, setNodes, edges, setEdges, selectedNodeId, 
                          })}
                      </ul>
 
-                     {/* Add New */}
                      <div style={{ display: 'flex', gap: '5px' }}>
                          <select 
                             value={connectTargetId} 
@@ -187,12 +259,12 @@ export function EditorPanel({ nodes, setNodes, edges, setEdges, selectedNodeId, 
                  </div>
              </div>
 
-             {/* Description (Body) */}
+             {/* 7. Description (Body) */}
              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#666' }}>Details</label>
                 <textarea 
                   value={selectedNode.data.body || ''}
-                  onChange={(e) => updateNode('body', e.target.value)}
+                  onChange={(e) => updateNodeData('body', e.target.value)}
                   style={{ flex: 1, width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', resize: 'none', fontFamily: 'inherit' }}
                   placeholder="Add details here..."
                 />
