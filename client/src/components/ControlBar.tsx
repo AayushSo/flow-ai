@@ -40,169 +40,205 @@ export const ControlBar: React.FC<ControlBarProps> = ({
   edgeStyle, onToggleEdgeStyle
 }) => {
 
+  // Height for the main input row
+  const CONTROL_HEIGHT = '52px'; 
+
+  // Colors
+  const bg = isDarkMode ? '#1e1e1e' : '#ffffff';
+  const text = isDarkMode ? '#e0e0e0' : '#333';
+  const border = isDarkMode ? '1px solid #333' : '1px solid #e0e0e0';
+  const inputBg = isDarkMode ? '#2c2c2c' : '#fff';
+  const inputBorder = isDarkMode ? '1px solid #444' : '1px solid #ccc';
+
+  // --- STYLES ---
+
   const barStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
+    gap: '15px',
     padding: '12px 20px',
-    borderBottom: isDarkMode ? '1px solid #333' : '1px solid #e0e0e0',
-    backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff',
-    color: isDarkMode ? '#e0e0e0' : '#333',
-    transition: 'all 0.3s ease',
+    borderBottom: border,
+    backgroundColor: bg,
+    color: text,
+    transition: 'background 0.3s, color 0.3s',
     flexWrap: 'wrap',
   };
 
-  const groupStyle: React.CSSProperties = {
+  // This container holds the [Textarea | Select | Generate] combo
+  const inputGroupStyle: React.CSSProperties = {
     display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    paddingRight: '12px',
-    borderRight: isDarkMode ? '1px solid #333' : '1px solid #e0e0e0',
+    flex: 1, // Take available space
+    minWidth: '300px',
+    height: CONTROL_HEIGHT,
+    alignItems: 'stretch', // Force children to fill height
+    boxShadow: isDarkMode ? 'none' : '0 1px 2px rgba(0,0,0,0.05)',
+    borderRadius: '8px',
   };
 
-  const btnBase: React.CSSProperties = {
+  const textareaStyle: React.CSSProperties = {
+    flex: 1,
+    height: '100%',
+    padding: '8px 12px',
+    border: inputBorder,
+    borderRight: 'none', // Merge with select
+    borderRadius: '8px 0 0 8px',
+    backgroundColor: inputBg,
+    color: text,
+    outline: 'none',
+    resize: 'none',
+    fontFamily: 'inherit',
+    fontSize: '14px',
+    lineHeight: '1.4',
+    boxSizing: 'border-box',
+  };
+
+  const selectStyle: React.CSSProperties = {
+    width: '110px',
+    height: '100%',
+    padding: '0 10px',
+    border: inputBorder,
+    borderLeft: '1px solid rgba(128,128,128,0.2)', // Subtle divider
+    borderRight: 'none', // Merge with button
+    borderRadius: '0',
+    backgroundColor: isDarkMode ? '#333' : '#f8f8f8',
+    color: text,
+    fontSize: '13px',
+    cursor: 'pointer',
+    outline: 'none',
+    boxSizing: 'border-box',
+  };
+
+  const generateBtnStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: '6px',
-    height: '36px',
-    padding: '0 12px',
+    padding: '0 20px',
+    height: '100%',
+    border: 'none',
+    borderRadius: '0 8px 8px 0',
+    backgroundColor: '#2563eb',
+    color: '#fff',
+    fontSize: '14px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'background 0.2s',
+    opacity: loading || !prompt ? 0.7 : 1,
+  };
+
+  // Standard small icon buttons
+  const iconBtnBase: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '38px',
+    height: '38px',
     borderRadius: '6px',
     border: 'none',
     cursor: 'pointer',
-    fontSize: '13px',
-    fontWeight: 500,
-    transition: 'background 0.2s',
     backgroundColor: isDarkMode ? '#2c2c2c' : '#f0f0f0',
-    color: isDarkMode ? '#fff' : '#333',
+    color: text,
+    transition: 'all 0.2s',
   };
 
-  const primaryBtn: React.CSSProperties = {
-    ...btnBase,
-    backgroundColor: '#2563eb', 
-    color: '#fff',
+  const groupContainer: React.CSSProperties = {
+    display: 'flex', 
+    alignItems: 'center', 
+    gap: '8px',
+    height: '100%' 
   };
 
-  const successBtn: React.CSSProperties = {
-    ...btnBase,
-    backgroundColor: '#10b981', 
-    color: '#fff',
-  };
-
-  const iconBtn: React.CSSProperties = {
-    ...btnBase,
-    padding: '0',
-    width: '36px', 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      onGenerate();
+    }
   };
 
   return (
     <div style={barStyle}>
       {/* 1. BRAND */}
-      <div style={{ fontWeight: 'bold', fontSize: '18px', marginRight: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span style={{ fontSize: '20px' }}>✨</span>
-        {/* FIX: Removed invalid 'md' property and used className instead */}
-        <span className="brand-text">AI Flow</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '5px' }}>
+        <span style={{ fontSize: '22px' }}>✨</span>
+        <span className="brand-text" style={{ fontWeight: 700, fontSize: '18px' }}>AI Flow</span>
       </div>
 
-      {/* 2. PROMPT INPUT */}
-      <div style={{ ...groupStyle, flex: 1, borderRight: 'none' }}>
-        <div style={{ position: 'relative', flex: 1, display: 'flex' }}>
-          <input
-            type="text"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && onGenerate()}
-            placeholder="Describe your flowchart..."
-            style={{
-              flex: 1,
-              height: '36px',
-              padding: '0 12px',
-              borderRadius: '6px 0 0 6px',
-              border: isDarkMode ? '1px solid #444' : '1px solid #ddd',
-              backgroundColor: isDarkMode ? '#2c2c2c' : '#fff',
-              color: isDarkMode ? '#fff' : '#000',
-              outline: 'none',
-            }}
-          />
-          <select
-            value={mode}
-            onChange={(e) => setMode(e.target.value)}
-            style={{
-              height: '38px', 
-              padding: '0 10px',
-              border: isDarkMode ? '1px solid #444' : '1px solid #ddd',
-              borderLeft: 'none',
-              borderRadius: '0 6px 6px 0',
-              backgroundColor: isDarkMode ? '#333' : '#f9f9f9',
-              color: isDarkMode ? '#fff' : '#333',
-              fontSize: '12px',
-              cursor: 'pointer',
-            }}
-          >
-            <option value="flowchart">Flowchart</option>
-            <option value="system">Architecture</option>
-          </select>
-        </div>
+      {/* 2. UNIFIED INPUT GROUP */}
+      <div style={inputGroupStyle}>
+        <textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Describe your process (e.g. 'User logs in -> System validates credentials...')"
+          style={textareaStyle}
+        />
+        
+        <select
+          value={mode}
+          onChange={(e) => setMode(e.target.value)}
+          style={selectStyle}
+        >
+          <option value="flowchart">Flowchart</option>
+          <option value="system">System Arch</option>
+        </select>
         
         <button 
           onClick={onGenerate} 
           disabled={loading || !prompt}
-          style={{ ...primaryBtn, opacity: loading || !prompt ? 0.6 : 1 }}
+          style={generateBtnStyle}
         >
-          {loading ? <RotateCw className="spin" size={16} /> : <Play size={16} fill="currentColor" />}
+          {loading ? <RotateCw className="spin" size={18} /> : <Play size={18} fill="currentColor" />}
           Generate
         </button>
       </div>
 
-      {/* 3. EDIT ACTIONS */}
-      <div style={groupStyle}>
+      {/* 3. TOOLBAR ACTIONS */}
+      <div style={groupContainer}>
+        {/* EDIT / APPLY */}
         {hasPendingChanges && (
-          <button onClick={onAcceptChanges} style={successBtn} title="Accept AI Changes">
-             <LayoutTemplate size={16} /> Apply
-          </button>
+           <button onClick={onAcceptChanges} style={{ ...iconBtnBase, width: 'auto', padding: '0 12px', backgroundColor: '#10b981', color: '#fff' }} title="Accept Changes">
+             <LayoutTemplate size={18} style={{ marginRight: 6 }}/> Apply
+           </button>
         )}
-        <button onClick={onAddNode} style={btnBase} title="Add Manual Node">
-            <PlusSquare size={16} /> Node
+        <button onClick={onAddNode} style={iconBtnBase} title="Add Node">
+          <PlusSquare size={18} />
         </button>
-      </div>
 
-      {/* 4. HISTORY */}
-      <div style={groupStyle}>
-        <button onClick={onUndo} disabled={!canUndo} style={{ ...iconBtn, opacity: !canUndo ? 0.3 : 1 }} title="Undo">
-          <RotateCcw size={16} />
-        </button>
-        <button onClick={onRedo} disabled={!canRedo} style={{ ...iconBtn, opacity: !canRedo ? 0.3 : 1 }} title="Redo">
-          <RotateCw size={16} />
-        </button>
-      </div>
+        <div style={{ width: 1, height: '24px', background: isDarkMode ? '#444' : '#ddd', margin: '0 4px' }} />
 
-      {/* 5. FILE OPS */}
-      <div style={{ ...groupStyle, borderRight: 'none' }}>
-        <button onClick={onNewCanvas} style={iconBtn} title="New Canvas">
-          <FilePlus size={16} />
+        {/* HISTORY */}
+        <button onClick={onUndo} disabled={!canUndo} style={{ ...iconBtnBase, opacity: !canUndo ? 0.3 : 1 }} title="Undo">
+          <RotateCcw size={18} />
         </button>
-        
-        <label style={iconBtn} title="Open File">
-          <Upload size={16} />
+        <button onClick={onRedo} disabled={!canRedo} style={{ ...iconBtnBase, opacity: !canRedo ? 0.3 : 1 }} title="Redo">
+          <RotateCw size={18} />
+        </button>
+
+        <div style={{ width: 1, height: '24px', background: isDarkMode ? '#444' : '#ddd', margin: '0 4px' }} />
+
+        {/* FILE OPS */}
+        <button onClick={onNewCanvas} style={iconBtnBase} title="Clear Canvas">
+          <FilePlus size={18} />
+        </button>
+        <label style={iconBtnBase} title="Upload JSON">
+          <Upload size={18} />
           <input type="file" onChange={onLoadFile} accept=".json" style={{ display: 'none' }} />
         </label>
-
-        <button onClick={onSave} style={iconBtn} title="Save JSON">
-          <Save size={16} />
+        <button onClick={onSave} style={iconBtnBase} title="Save JSON">
+          <Save size={18} />
         </button>
-
-        <button onClick={onExport} style={iconBtn} title="Export PNG">
-          <ImageIcon size={16} />
+        <button onClick={onExport} style={iconBtnBase} title="Export Image">
+          <ImageIcon size={18} />
         </button>
-
-        {/* EDGE STYLE TOGGLE */}
-        <button onClick={onToggleEdgeStyle} style={iconBtn} title={`Edge Style: ${edgeStyle === 'default' ? 'Bezier' : 'Step'}`}>
-          <CornerDownLeft size={16} />
+        
+        <div style={{ width: 1, height: '24px', background: isDarkMode ? '#444' : '#ddd', margin: '0 4px' }} />
+        
+        {/* VIEW SETTINGS */}
+        <button onClick={onToggleEdgeStyle} style={iconBtnBase} title={`Edge Style: ${edgeStyle === 'default' ? 'Bezier' : 'Right Angle'}`}>
+          <CornerDownLeft size={18} />
         </button>
-
-        {/* DARK MODE TOGGLE */}
-        <button onClick={toggleDarkMode} style={{ ...iconBtn, marginLeft: '8px' }} title="Toggle Theme">
-           {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
+        <button onClick={toggleDarkMode} style={iconBtnBase} title="Toggle Theme">
+           {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
         </button>
       </div>
 
@@ -210,11 +246,13 @@ export const ControlBar: React.FC<ControlBarProps> = ({
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
         
-        /* Responsive Brand Text */
         .brand-text { display: none; }
-        @media (min-width: 768px) {
+        @media (min-width: 900px) {
             .brand-text { display: block; }
         }
+        
+        textarea::-webkit-scrollbar { width: 4px; }
+        textarea::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 2px; }
       `}</style>
     </div>
   );
