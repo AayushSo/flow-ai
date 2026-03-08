@@ -248,6 +248,70 @@ export function EditorPanel({
                     />
                 </div>
 
+                {selectedNode.type === 'group' && (
+                <>
+                <div>
+                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', opacity: 0.7 }}>Auto-Snap Children</label>
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                        <button
+                            onClick={() => updateNodeData('autoSnap', true)}
+                            style={{
+                                flex: 1, padding: '8px', borderRadius: '4px', cursor: 'pointer',
+                                border: selectedNode.data.autoSnap !== false ? `2px solid ${isDarkMode ? '#fff' : '#333'}` : `1px solid ${borderColor}`,
+                                backgroundColor: selectedNode.data.autoSnap !== false ? (isDarkMode ? '#444' : '#eee') : inputBg,
+                                color: textColor,
+                                fontSize: '12px'
+                            }}
+                        >
+                            Snap On
+                        </button>
+                        <button
+                            onClick={() => updateNodeData('autoSnap', false)}
+                            style={{
+                                flex: 1, padding: '8px', borderRadius: '4px', cursor: 'pointer',
+                                border: selectedNode.data.autoSnap === false ? `2px solid ${isDarkMode ? '#fff' : '#333'}` : `1px solid ${borderColor}`,
+                                backgroundColor: selectedNode.data.autoSnap === false ? (isDarkMode ? '#444' : '#eee') : inputBg,
+                                color: textColor,
+                                fontSize: '12px'
+                            }}
+                        >
+                            Snap Off
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', opacity: 0.7 }}>Lock Children Inside</label>
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                        <button
+                            onClick={() => updateNodeData('lockChildren', true)}
+                            style={{
+                                flex: 1, padding: '8px', borderRadius: '4px', cursor: 'pointer',
+                                border: selectedNode.data.lockChildren === true ? `2px solid ${isDarkMode ? '#fff' : '#333'}` : `1px solid ${borderColor}`,
+                                backgroundColor: selectedNode.data.lockChildren === true ? (isDarkMode ? '#444' : '#eee') : inputBg,
+                                color: textColor,
+                                fontSize: '12px'
+                            }}
+                        >
+                            Lock On
+                        </button>
+                        <button
+                            onClick={() => updateNodeData('lockChildren', false)}
+                            style={{
+                                flex: 1, padding: '8px', borderRadius: '4px', cursor: 'pointer',
+                                border: selectedNode.data.lockChildren !== true ? `2px solid ${isDarkMode ? '#fff' : '#333'}` : `1px solid ${borderColor}`,
+                                backgroundColor: selectedNode.data.lockChildren !== true ? (isDarkMode ? '#444' : '#eee') : inputBg,
+                                color: textColor,
+                                fontSize: '12px'
+                            }}
+                        >
+                            Lock Off
+                        </button>
+                    </div>
+                </div>
+                </>
+                )}
+
                 <div>
                     <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', opacity: 0.7 }}>Shape</label>
                     <div style={{ display: 'flex', gap: '5px' }}>

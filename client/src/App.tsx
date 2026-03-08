@@ -12,7 +12,7 @@ import {
   getNodesBounds,
   reconnectEdge,
   type Connection,
-  type Node,      
+  type Node,
   type Edge
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -124,7 +124,97 @@ function Flowchart() {
   const onNodesChangeWrapped = useCallback((changes: any) => {
     onNodesChange(changes);
     if (changes.length > 0) setIsDirty(true);
-  }, [onNodesChange]);
+
+    // Auto-resize groups when children move (if autoSnap is enabled)
+    const positionChanges = changes.filter((c: any) => c.type === 'position' && c.position && !c.dragging);
+    if (positionChanges.length > 0) {
+      setNodes((nds) => {
+        const groupsToUpdate = new Set<string>();
+        
+        // Find groups that need updates
+        positionChanges.forEach((change: any) => {
+          const node = nds.find((n) => n.id === change.id);
+          if (node?.parentId) {
+            const parent = nds.find((n) => n.id === node.parentId);
+            if (parent?.type === 'group' && parent.data?.autoSnap !== false) {
+              groupsToUpdate.add(node.parentId);
+            }
+          }
+        });
+
+        if (groupsToUpdate.size === 0) return nds;
+
+        // Recalculate bounds for affected groups
+        const updatedNodes = [...nds];
+        groupsToUpdate.forEach((groupId) => {
+          const children = updatedNodes.filter((n) => n.parentId === groupId);
+          if (children.length === 0) return;
+
+          const groupNode = updatedNodes.find((n) => n.id === groupId);
+          if (!groupNode) return;
+
+          const groupPaddingX = 36;
+          const groupPaddingTop = 48;
+          const groupPaddingBottom = 28;
+
+          const childBounds = children.map((child) => {
+            const width = (child.measured?.width || child.style?.width || 180) as number;
+            const height = (child.measured?.height || child.style?.height || 80) as number;
+            const absX = groupNode.position.x + child.position.x;
+            const absY = groupNode.position.y + child.position.y;
+            return {
+              minX: absX,
+              minY: absY,
+              maxX: absX + width,
+              maxY: absY + height
+            };
+          });
+
+          const minX = Math.min(...childBounds.map((b) => b.minX));
+          const minY = Math.min(...childBounds.map((b) => b.minY));
+          const maxX = Math.max(...childBounds.map((b) => b.maxX));
+          const maxY = Math.max(...childBounds.map((b) => b.maxY));
+
+          const newGroupX = minX - groupPaddingX;
+          const newGroupY = minY - groupPaddingTop;
+          const newGroupWidth = Math.max(220, maxX - minX + groupPaddingX * 2);
+          const newGroupHeight = Math.max(160, maxY - minY + groupPaddingTop + groupPaddingBottom);
+
+          // Update group position and size
+          const groupIndex = updatedNodes.findIndex((n) => n.id === groupId);
+          if (groupIndex !== -1) {
+            updatedNodes[groupIndex] = {
+              ...updatedNodes[groupIndex],
+              position: { x: newGroupX, y: newGroupY },
+              style: {
+                ...updatedNodes[groupIndex].style,
+                width: newGroupWidth,
+                height: newGroupHeight
+              }
+            };
+
+            // Update child relative positions
+            children.forEach((child) => {
+              const childIndex = updatedNodes.findIndex((n) => n.id === child.id);
+              if (childIndex !== -1) {
+                const absX = groupNode.position.x + child.position.x;
+                const absY = groupNode.position.y + child.position.y;
+                updatedNodes[childIndex] = {
+                  ...updatedNodes[childIndex],
+                  position: {
+                    x: absX - newGroupX,
+                    y: absY - newGroupY
+                  }
+                };
+              }
+            });
+          }
+        });
+
+        return updatedNodes;
+      });
+    }
+  }, [onNodesChange, setNodes]);
 
   const onEdgesChangeWrapped = useCallback((changes: any) => {
     onEdgesChange(changes);
@@ -240,20 +330,25 @@ function Flowchart() {
         await new Promise((resolve) => setTimeout(resolve, 50));
       }
 
-      const nodesBounds = getNodesBounds(getNodes());
-      const padding = 100;
-      const viewportElem = document.querySelector('.react-flow__viewport') as HTMLElement;
+      const currentNodes = getNodes();
+      if (currentNodes.length === 0) return;
 
+      const nodesBounds = getNodesBounds(currentNodes);
+      const padding = 40;
+      const imageWidth = Math.ceil(nodesBounds.width + padding * 2);
+      const imageHeight = Math.ceil(nodesBounds.height + padding * 2);
+      
+      const viewportElem = document.querySelector('.react-flow__viewport') as HTMLElement;
       if (!viewportElem) return;
 
       const dataUrl = await toPng(viewportElem, {
-        backgroundColor: '#ffffff', // FORCE WHITE BG
-        width: nodesBounds.width + padding,
-        height: nodesBounds.height + padding,
+        backgroundColor: '#ffffff',
+        width: imageWidth,
+        height: imageHeight,
         style: {
-          width: `${nodesBounds.width + padding}px`,
-          height: `${nodesBounds.height + padding}px`,
-          transform: `translate(${-nodesBounds.x + (padding / 2)}px, ${-nodesBounds.y + (padding / 2)}px) scale(1)`,
+          width: `${imageWidth}px`,
+          height: `${imageHeight}px`,
+          transform: `translate(${-nodesBounds.x + padding}px, ${-nodesBounds.y + padding}px) scale(1)`
         },
         filter: (node: any) => {
           if (node.classList && node.classList.contains('react-flow__handle')) return false;
@@ -271,14 +366,13 @@ function Flowchart() {
           node.querySelectorAll('.react-flow__edge-textbg').forEach((el) => {
             (el as HTMLElement).style.fill = '#ffffff';
           });
-        },
+        }
       } as any);
 
       const a = document.createElement('a');
       a.href = dataUrl;
       a.download = `flowchart-${Date.now()}.png`;
       a.click();
-
     } catch (err) {
       console.error('Export failed', err);
     } finally {
@@ -313,7 +407,9 @@ function Flowchart() {
               body: node.data.body || (existingNode?.data?.body || ""), 
               icon: existingNode?.data?.icon || "", 
               subtitle: existingNode?.data?.subtitle || "",
-              backgroundColor: isNew ? '#d0f0c0' : (existingNode?.data?.backgroundColor || '#ffffff')
+              backgroundColor: isNew ? '#d0f0c0' : (existingNode?.data?.backgroundColor || '#ffffff'),
+              autoSnap: isGroup ? (existingNode?.data?.autoSnap ?? true) : undefined,
+              lockChildren: isGroup ? (existingNode?.data?.lockChildren ?? false) : undefined
             }, 
             style: isGroup ? { width: 100, height: 100, zIndex: -1 } : {}
         };

@@ -3,12 +3,12 @@ import { MarkerType } from "@xyflow/react";
 export const getDemoData = () => {
     const nodes = [
         // Group 1: Frontend
-        { id: 'g1', type: 'group', position: { x: 0, y: 0 }, data: { label: 'Frontend Cluster' }, style: { backgroundColor: 'rgba(240, 240, 240, 0.5)', width: 400, height: 200, border: '2px dashed #aaa' } },
+        { id: 'g1', type: 'group', position: { x: 0, y: 0 }, data: { label: 'Frontend Cluster', autoSnap: true, lockChildren: false }, style: { backgroundColor: 'rgba(240, 240, 240, 0.5)', width: 400, height: 200, border: '2px dashed #aaa' } },
         { id: 'n1', parentId: 'g1', position: { x: 20, y: 20 }, data: { label: 'React App' }, style: { width: 150, height: 40, backgroundColor: '#fff', border: '1px solid #333' } },
         { id: 'n2', parentId: 'g1', position: { x: 200, y: 20 }, data: { label: 'CDN' }, style: { width: 150, height: 40, backgroundColor: '#fff', border: '1px solid #333' } },
 
         // Group 2: Backend
-        { id: 'g2', type: 'group', position: { x: 0, y: 0 }, data: { label: 'Backend Cluster' }, style: { backgroundColor: 'rgba(240, 240, 240, 0.5)', width: 400, height: 300, border: '2px dashed #aaa' } },
+        { id: 'g2', type: 'group', position: { x: 0, y: 0 }, data: { label: 'Backend Cluster', autoSnap: true, lockChildren: false }, style: { backgroundColor: 'rgba(240, 240, 240, 0.5)', width: 400, height: 300, border: '2px dashed #aaa' } },
         { id: 'n3', parentId: 'g2', position: { x: 20, y: 20 }, data: { label: 'API Gateway' }, style: { width: 150, height: 40, backgroundColor: '#fff', border: '1px solid #333' } },
         { id: 'n4', parentId: 'g2', position: { x: 20, y: 100 }, data: { label: 'Auth Service' }, style: { width: 150, height: 40, backgroundColor: '#fff', border: '1px solid #333' } },
         { id: 'n5', parentId: 'g2', position: { x: 200, y: 100 }, data: { label: 'Core Service' }, style: { width: 150, height: 40, backgroundColor: '#fff', border: '1px solid #333' } },
