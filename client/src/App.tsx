@@ -26,6 +26,14 @@ import { ControlBar } from "./components/ControlBar";
 import { getDemoData } from "./data/demoData";
 import { SmartNode, GroupNode, DecisionNode, LayeredNode } from "./components/CustomNodes";
 
+type EdgeLabelPlacement = 'above' | 'center' | 'below';
+
+const getEdgeLabelOffset = (placement: EdgeLabelPlacement) => {
+  if (placement === 'above') return -14;
+  if (placement === 'below') return 14;
+  return 0;
+};
+
 export default function App() {
   return (
     <ReactFlowProvider>
@@ -53,11 +61,45 @@ function Flowchart() {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   
   const { fitView, getNodes, toObject } = useReactFlow();
   
   const nodeTypes = useMemo(() => ({ smart: SmartNode, group: GroupNode, decision: DecisionNode, layered: LayeredNode }), []);
+
+  const buildEdgeWithPresentation = useCallback((edge: any, forcedType?: 'default' | 'smoothstep') => {
+    const placement = (edge?.data?.labelPlacement || 'center') as EdgeLabelPlacement;
+    const offset = getEdgeLabelOffset(placement);
+
+    return {
+      ...edge,
+      type: forcedType || edge.type || edgeStyle,
+      markerEnd: edge.markerEnd || { type: MarkerType.ArrowClosed },
+      style: {
+        strokeWidth: 2,
+        stroke: isDarkMode ? '#aaa' : '#333',
+        ...(edge.style || {})
+      },
+      data: {
+        ...(edge.data || {}),
+        labelPlacement: placement
+      },
+      labelShowBg: true,
+      labelBgPadding: [8, 4],
+      labelBgBorderRadius: 4,
+      labelBgStyle: {
+        fill: isDarkMode ? '#1e1e1e' : '#ffffff',
+        fillOpacity: 0.95
+      },
+      labelStyle: {
+        fill: isDarkMode ? '#eaeaea' : '#222222',
+        fontSize: 12,
+        ...(edge.labelStyle || {}),
+        transform: `translateY(${offset}px)`
+      }
+    };
+  }, [edgeStyle, isDarkMode]);
 
   // --- HELPER: Toggle Edge Style ---
   // FIX: This now updates both the "future preference" AND "existing edges"
@@ -66,10 +108,7 @@ function Flowchart() {
     setEdgeStyle(newStyle);
     
     // Explicitly update all existing edges on the canvas
-    setEdges((eds) => eds.map(e => ({
-      ...e,
-      type: newStyle
-    })));
+    setEdges((eds) => eds.map((e) => buildEdgeWithPresentation(e, newStyle)));
     
     setIsDirty(true);
   };
@@ -93,15 +132,13 @@ function Flowchart() {
   }, [onEdgesChange]);
 
   const onConnectWrapped = useCallback((params: any) => {
-    const newEdge = { 
-        ...params, 
-        type: edgeStyle, 
-        markerEnd: { type: MarkerType.ArrowClosed },
-        style: { stroke: isDarkMode ? '#aaa' : '#333', strokeWidth: 2 } 
-    };
+    const newEdge = buildEdgeWithPresentation({
+      ...params,
+      data: { labelPlacement: 'center' }
+    }, edgeStyle);
     setEdges((eds) => addEdge(newEdge, eds));
     setIsDirty(true);
-  }, [setEdges, edgeStyle, isDarkMode]);
+  }, [setEdges, edgeStyle, buildEdgeWithPresentation]);
 
   const handleAddNode = () => {
     const id = `manual-${Date.now()}`;
@@ -180,8 +217,9 @@ function Flowchart() {
         const flowData = JSON.parse(evt.target?.result as string);
         if (flowData.nodes && flowData.edges) {
           setNodes(flowData.nodes);
-          setEdges(flowData.edges);
-          setHistory([{ nodes: flowData.nodes, edges: flowData.edges }]);
+          const normalizedEdges = flowData.edges.map((edge: any) => buildEdgeWithPresentation(edge));
+          setEdges(normalizedEdges);
+          setHistory([{ nodes: flowData.nodes, edges: normalizedEdges }]);
           setHistoryIndex(0);
           setIsDirty(false);
           setTimeout(() => fitView(), 100);
@@ -280,14 +318,7 @@ function Flowchart() {
             style: isGroup ? { width: 100, height: 100, zIndex: -1 } : {}
         };
       });
-      const processedEdges = res.data.edges.map((edge: any) => ({
-        ...edge,
-        type: edgeStyle, 
-        markerEnd: { type: MarkerType.ArrowClosed },
-        style: { strokeWidth: 2, stroke: '#333' },
-        labelBgStyle: { fill: '#ffffff' },
-        labelStyle: { fill: '#000000' },
-      }));
+      const processedEdges = res.data.edges.map((edge: any) => buildEdgeWithPresentation(edge, edgeStyle));
 
       const { nodes: layoutedNodes, edges: lEdges } = getLayoutedElements(processedNodes, processedEdges);
 
@@ -320,7 +351,8 @@ function Flowchart() {
   const loadDemo = () => {
     if (nodes.length > 0 && isDirty && !window.confirm("Discard changes?")) return;
     const { nodes: dNodes, edges: dEdges } = getDemoData();
-    const { nodes: lNodes, edges: lEdges } = getLayoutedElements(dNodes, dEdges);
+    const normalizedDemoEdges = dEdges.map((edge: any) => buildEdgeWithPresentation(edge));
+    const { nodes: lNodes, edges: lEdges } = getLayoutedElements(dNodes, normalizedDemoEdges);
     setNodes(lNodes); setEdges(lEdges);
     setHistory([{ nodes: lNodes, edges: lEdges }]); setHistoryIndex(0);
     setIsDirty(false); setTimeout(() => fitView(), 100);
@@ -365,8 +397,13 @@ function Flowchart() {
         <ReactFlow 
             nodes={nodes} edges={edges} nodeTypes={nodeTypes} 
             onNodesChange={onNodesChangeWrapped} onEdgesChange={onEdgesChangeWrapped}
-            onNodeClick={(_, n) => { setSelectedNodeId(n.id); setEditorOpen(true); }} 
-            onPaneClick={() => setSelectedNodeId(null)} 
+            onSelectionChange={({ nodes: selectedNodes, edges: selectedEdges }) => {
+              setSelectedNodeId(selectedNodes.length > 0 ? selectedNodes[0].id : null);
+              setSelectedEdgeId(selectedEdges.length > 0 ? selectedEdges[0].id : null);
+              if (selectedNodes.length > 0 || selectedEdges.length > 0) {
+                setEditorOpen(true);
+              }
+            }}
             onConnect={onConnectWrapped}
             onReconnect={onReconnect}
             fitView minZoom={0.1}
@@ -381,6 +418,7 @@ function Flowchart() {
             setNodes={(val: any) => { setNodes(val); setIsDirty(true); }} 
             setEdges={(val: any) => { setEdges(val); setIsDirty(true); }} 
             selectedNodeId={selectedNodeId} 
+            selectedEdgeId={selectedEdgeId}
             isOpen={editorOpen} toggleOpen={() => setEditorOpen(!editorOpen)} 
             onAddNode={handleAddNode}
             isDarkMode={isDarkMode} 

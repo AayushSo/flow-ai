@@ -4,10 +4,18 @@ import {
   Square, Layers, Diamond 
 } from 'lucide-react';
 
+type EdgeLabelPlacement = 'above' | 'center' | 'below';
+
+const getEdgeLabelOffset = (placement: EdgeLabelPlacement) => {
+        if (placement === 'above') return -14;
+        if (placement === 'below') return 14;
+        return 0;
+};
+
 // Add isDarkMode to props
 export function EditorPanel({ 
   nodes, setNodes, edges, setEdges, 
-  selectedNodeId, isOpen, toggleOpen, 
+    selectedNodeId, selectedEdgeId, isOpen, toggleOpen, 
   isDarkMode 
 }: any) {
     const colorInputRef = useRef<HTMLInputElement>(null);
@@ -37,6 +45,7 @@ export function EditorPanel({
     }
   
     const selectedNode = nodes.find((n: any) => n.id === selectedNodeId);
+    const selectedEdge = edges.find((e: any) => e.id === selectedEdgeId);
     const otherNodes = nodes.filter((n: any) => n.id !== selectedNodeId);
     const outgoingEdges = edges.filter((e: any) => e.source === selectedNodeId);
 
@@ -47,6 +56,31 @@ export function EditorPanel({
           }
           return n;
       }));
+    };
+
+    const updateEdgeData = (field: string, value: any) => {
+        setEdges((eds: any[]) => eds.map((e) => {
+            if (e.id !== selectedEdgeId) return e;
+
+            const placement = (field === 'labelPlacement' ? value : (e.data?.labelPlacement || 'center')) as EdgeLabelPlacement;
+            const offset = getEdgeLabelOffset(placement);
+
+            return {
+                ...e,
+                ...(field === 'labelPlacement' ? { data: { ...(e.data || {}), labelPlacement: placement } } : { [field]: value }),
+                labelShowBg: true,
+                labelBgPadding: [8, 4],
+                labelBgBorderRadius: 4,
+                labelBgStyle: {
+                    fill: isDarkMode ? '#1e1e1e' : '#ffffff',
+                    fillOpacity: 0.95
+                },
+                labelStyle: {
+                    ...(e.labelStyle || {}),
+                    transform: `translateY(${offset}px)`
+                }
+            };
+        }));
     };
 
     const updateNodeType = (newType: string) => {
@@ -73,7 +107,12 @@ export function EditorPanel({
             target: connectTargetId,
             type: 'default', 
             markerEnd: { type: MarkerType.ArrowClosed },
-            style: { stroke: '#333', strokeWidth: 2 }
+            style: { stroke: '#333', strokeWidth: 2 },
+            data: { labelPlacement: 'center' },
+            labelShowBg: true,
+            labelBgPadding: [8, 4],
+            labelBgBorderRadius: 4,
+            labelBgStyle: { fill: isDarkMode ? '#1e1e1e' : '#ffffff', fillOpacity: 0.95 }
         };
         setEdges((eds: any[]) => [...eds, newEdge]);
         setConnectTargetId(""); 
@@ -81,6 +120,13 @@ export function EditorPanel({
 
     const handleDeleteEdge = (edgeId: string) => {
         setEdges((eds: any[]) => eds.filter((e) => e.id !== edgeId));
+    };
+
+    const handleDeleteSelectedEdge = () => {
+        if (!selectedEdgeId) return;
+        if (!window.confirm("Delete this edge?")) return;
+        setEdges((eds: any[]) => eds.filter((e) => e.id !== selectedEdgeId));
+        toggleOpen();
     };
 
     const presetColors = ['#ffffff', '#ffcccb', '#c1e1c1', '#add8e6', '#f0e68c', '#e6d2b5', '#e6e6fa'];
@@ -129,7 +175,58 @@ export function EditorPanel({
   
         {/* SCROLLABLE CONTENT */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            {selectedNode ? (
+            {selectedEdge ? (
+            <>
+                <div>
+                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', opacity: 0.7 }}>Edge Label</label>
+                    <input
+                    type="text"
+                    value={selectedEdge.label || ''}
+                    onChange={(e) => updateEdgeData('label', e.target.value)}
+                    style={inputStyle}
+                    placeholder="Add label for this edge..."
+                    />
+                </div>
+
+                <div>
+                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', opacity: 0.7 }}>Label Position</label>
+                    <select
+                    value={selectedEdge.data?.labelPlacement || 'center'}
+                    onChange={(e) => updateEdgeData('labelPlacement', e.target.value)}
+                    style={inputStyle}
+                    >
+                        <option value="above">Above line</option>
+                        <option value="center">On line</option>
+                        <option value="below">Below line</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', opacity: 0.7 }}>From</label>
+                    <div style={{ ...inputStyle, opacity: 0.8 }}>
+                        {nodes.find((n: any) => n.id === selectedEdge.source)?.data?.label || selectedEdge.source}
+                    </div>
+                </div>
+
+                <div>
+                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', opacity: 0.7 }}>To</label>
+                    <div style={{ ...inputStyle, opacity: 0.8 }}>
+                        {nodes.find((n: any) => n.id === selectedEdge.target)?.data?.label || selectedEdge.target}
+                    </div>
+                </div>
+
+                <button
+                    onClick={handleDeleteSelectedEdge}
+                    style={{
+                        marginTop: '10px', padding: '10px', backgroundColor: '#3f1515',
+                        color: '#ff6b6b', border: '1px solid #ff6b6b', borderRadius: '4px', cursor: 'pointer'
+                    }}
+                >
+                    Delete Edge
+                </button>
+                <div style={{ height: '20px' }}></div>
+            </>
+            ) : selectedNode ? (
             <>
                 <div>
                     <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', opacity: 0.7 }}>Label</label>
@@ -285,7 +382,7 @@ export function EditorPanel({
             </>
             ) : (
             <div style={{ padding: '20px', textAlign: 'center', opacity: 0.5 }}>
-                Select a node to edit or delete it.
+                Select a node or edge to edit.
             </div>
             )}
         </div>
